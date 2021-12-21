@@ -114,9 +114,7 @@ static EVENTS_LIST: Mutex<Vec<FsEvent>> = parking_lot::const_mutex(Vec::new());
 
 #[no_mangle]
 pub extern "C" fn init_sdk() {
-    if let Err(e) = RUNTIME.block_on(init_worker()) {
-        panic!("{:?}", e);
-    }
+    RUNTIME.spawn(init_worker());
 }
 
 #[no_mangle]
