@@ -2,6 +2,8 @@
 mod fsevent;
 mod fsevent_flags;
 mod fsevent_pb;
+mod processor;
+mod runtime;
 
 use fsevent::FsEvent;
 
@@ -12,15 +14,19 @@ use core_foundation::{
     runloop::{kCFRunLoopDefaultMode, CFRunLoopGetCurrent, CFRunLoopRun},
     string::CFString,
 };
+use crossbeam::atomic::AtomicCell;
 use fsevent_sys::{
     kFSEventStreamCreateFlagFileEvents, kFSEventStreamCreateFlagNoDefer,
     kFSEventStreamEventIdSinceNow, FSEventStreamContext, FSEventStreamCreate,
     FSEventStreamEventFlags, FSEventStreamEventId, FSEventStreamRef,
     FSEventStreamScheduleWithRunLoop, FSEventStreamStart,
 };
-use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use tokio::{runtime, sync::mpsc, task};
+use runtime::runtime;
+use tokio::{
+    sync::mpsc::{self, UnboundedReceiver},
+    task,
+};
 
 use std::{ffi::c_void, ptr, slice};
 
@@ -50,7 +56,7 @@ extern "C" fn raw_callback(
     callback(events);
 }
 
-fn listen(paths: Vec<String>, callback: EventsCallback) -> Result<()> {
+fn watch_fs_events(paths: Vec<String>, callback: EventsCallback) -> Result<()> {
     extern "C" fn drop_callback(info: *const c_void) {
         let _cb: Box<EventsCallback> = unsafe { Box::from_raw(info as _) };
     }
@@ -86,35 +92,28 @@ fn listen(paths: Vec<String>, callback: EventsCallback) -> Result<()> {
     Ok(())
 }
 
-async fn init_worker() -> Result<()> {
-    let (sender, mut receiver) = mpsc::unbounded_channel();
-    let paths = vec!["/".into()];
-    task::spawn_blocking(move || {
-        let callback = Box::new(move |events| {
-            sender.send(events).unwrap();
-        });
-        listen(paths, callback).unwrap();
+fn spawn_watcher() -> UnboundedReceiver<Vec<FsEvent>> {
+    let (sender, receiver) = mpsc::unbounded_channel();
+    runtime().spawn_blocking(move || {
+        watch_fs_events(
+            vec!["/".into()],
+            Box::new(move |events| {
+                sender.send(events).unwrap();
+            }),
+        )
+        .unwrap();
     });
-    while let Some(events) = receiver.recv().await {
-        EVENTS_LIST.lock().extend(events.into_iter());
-    }
-    Ok(())
+    receiver
 }
 
-static RUNTIME: Lazy<runtime::Runtime> = Lazy::new(|| {
-    runtime::Builder::new_multi_thread()
-        .thread_name("cardinal")
-        .worker_threads(4)
-        .enable_all()
-        .build()
-        .unwrap()
-});
-
-static EVENTS_LIST: Mutex<Vec<FsEvent>> = parking_lot::const_mutex(Vec::new());
+fn spawn_processor(receiver: UnboundedReceiver<Vec<FsEvent>>) {
+    runtime().spawn(processor::processor(receiver));
+}
 
 #[no_mangle]
 pub extern "C" fn init_sdk() {
-    RUNTIME.spawn(init_worker());
+    let receiver = spawn_watcher();
+    spawn_processor(receiver);
 }
 
 #[no_mangle]
@@ -122,6 +121,7 @@ pub extern "C" fn get_events(
     context: *const i8,
     callback: Option<unsafe extern "C" fn(*const i8, *const i8)>,
 ) {
-    let bytes = fsevent::write_events_to_bytes(&EVENTS_LIST.lock());
+    let events = processor::take_fs_events();
+    let bytes = fsevent::write_events_to_bytes(&events);
     callback.map(|c| unsafe { c(context, bytes.as_ptr() as _) });
 }
