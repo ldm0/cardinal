@@ -9,6 +9,7 @@ mod runtime;
 pub use c::*;
 use fsevent::FsEvent;
 pub use processor::take_fs_events;
+use processor::Processor;
 
 use anyhow::{bail, Result};
 use core_foundation::{
@@ -17,13 +18,13 @@ use core_foundation::{
     runloop::{kCFRunLoopDefaultMode, CFRunLoopGetCurrent, CFRunLoopRun},
     string::CFString,
 };
+use crossbeam::channel::{self, Receiver};
 use fsevent_sys::{
     kFSEventStreamCreateFlagFileEvents, kFSEventStreamCreateFlagNoDefer, FSEventStreamContext,
     FSEventStreamCreate, FSEventStreamEventFlags, FSEventStreamEventId, FSEventStreamRef,
     FSEventStreamScheduleWithRunLoop, FSEventStreamStart, FSEventsGetCurrentEventId,
 };
 use runtime::runtime;
-use tokio::sync::mpsc::{self, UnboundedReceiver};
 
 use std::{ffi::c_void, ptr, slice};
 
@@ -93,8 +94,8 @@ fn watch_fs_events(
     Ok(())
 }
 
-fn spawn_watcher(since: FSEventStreamEventId) -> UnboundedReceiver<Vec<FsEvent>> {
-    let (sender, receiver) = mpsc::unbounded_channel();
+fn spawn_watcher(since: FSEventStreamEventId) -> Receiver<Vec<FsEvent>> {
+    let (sender, receiver) = channel::unbounded();
     runtime().spawn_blocking(move || {
         watch_fs_events(
             vec!["/".into()],
@@ -108,8 +109,15 @@ fn spawn_watcher(since: FSEventStreamEventId) -> UnboundedReceiver<Vec<FsEvent>>
     receiver
 }
 
-fn spawn_processor(since: FSEventStreamEventId, receiver: UnboundedReceiver<Vec<FsEvent>>) {
-    runtime().spawn(processor::processor(since, receiver));
+fn spawn_processor(since: FSEventStreamEventId, receiver: Receiver<Vec<FsEvent>>) {
+    if let Err(_) = processor::PROCESSOR.set(Processor::new(since, receiver)) {
+        panic!("Multiple initialization");
+    }
+    runtime().spawn_blocking(|| loop {
+        if let Err(e) = processor::PROCESSOR.get().unwrap().process() {
+            panic!("processor is down. {}", e);
+        }
+    });
 }
 
 pub fn init_sdk() {

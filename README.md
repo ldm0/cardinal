@@ -2,16 +2,27 @@
 
 The open-source and cross-platform Everything.
 
+The event processor is sync and it uses dedicated threads.
+
 ```
 cbindgen --config cbindgen.toml --crate cardinal --output cardinal.h
 ```
 
-// touch tmp.md:
+// touch tmp.md(uncreated):
 [
     FsEvent {
         path: "/Users/bytedance/code/cardinal/tmp.md",
         flag: kFSEventStreamEventFlagItemCreated | kFSEventStreamEventFlagItemIsFile,
         id: 281055642,
+    },
+]
+
+// touch README.md(created)
+[
+    FsEvent {
+        path: "/Users/bytedance/code/cardinal/README.md",
+        flag: kFSEventStreamEventFlagItemInodeMetaMod | kFSEventStreamEventFlagItemIsFile,
+        id: 313783990,
     },
 ]
 
