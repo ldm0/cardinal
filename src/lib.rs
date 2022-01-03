@@ -18,10 +18,9 @@ use core_foundation::{
     string::CFString,
 };
 use fsevent_sys::{
-    kFSEventStreamCreateFlagFileEvents, kFSEventStreamCreateFlagNoDefer,
-    kFSEventStreamEventIdSinceNow, FSEventStreamContext, FSEventStreamCreate,
-    FSEventStreamEventFlags, FSEventStreamEventId, FSEventStreamRef,
-    FSEventStreamScheduleWithRunLoop, FSEventStreamStart,
+    kFSEventStreamCreateFlagFileEvents, kFSEventStreamCreateFlagNoDefer, FSEventStreamContext,
+    FSEventStreamCreate, FSEventStreamEventFlags, FSEventStreamEventId, FSEventStreamRef,
+    FSEventStreamScheduleWithRunLoop, FSEventStreamStart, FSEventsGetCurrentEventId,
 };
 use runtime::runtime;
 use tokio::sync::mpsc::{self, UnboundedReceiver};
@@ -54,7 +53,11 @@ extern "C" fn raw_callback(
     callback(events);
 }
 
-fn watch_fs_events(paths: Vec<String>, callback: EventsCallback) -> Result<()> {
+fn watch_fs_events(
+    paths: Vec<String>,
+    since: FSEventStreamEventId,
+    callback: EventsCallback,
+) -> Result<()> {
     extern "C" fn drop_callback(info: *const c_void) {
         let _cb: Box<EventsCallback> = unsafe { Box::from_raw(info as _) };
     }
@@ -75,7 +78,7 @@ fn watch_fs_events(paths: Vec<String>, callback: EventsCallback) -> Result<()> {
             raw_callback,
             context,
             paths.as_concrete_TypeRef() as _,
-            kFSEventStreamEventIdSinceNow,
+            since,
             0.1,
             kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagFileEvents,
         )
@@ -90,11 +93,12 @@ fn watch_fs_events(paths: Vec<String>, callback: EventsCallback) -> Result<()> {
     Ok(())
 }
 
-fn spawn_watcher() -> UnboundedReceiver<Vec<FsEvent>> {
+fn spawn_watcher(since: FSEventStreamEventId) -> UnboundedReceiver<Vec<FsEvent>> {
     let (sender, receiver) = mpsc::unbounded_channel();
     runtime().spawn_blocking(move || {
         watch_fs_events(
             vec!["/".into()],
+            since,
             Box::new(move |events| {
                 sender.send(events).unwrap();
             }),
@@ -104,11 +108,12 @@ fn spawn_watcher() -> UnboundedReceiver<Vec<FsEvent>> {
     receiver
 }
 
-fn spawn_processor(receiver: UnboundedReceiver<Vec<FsEvent>>) {
-    runtime().spawn(processor::processor(receiver));
+fn spawn_processor(since: FSEventStreamEventId, receiver: UnboundedReceiver<Vec<FsEvent>>) {
+    runtime().spawn(processor::processor(since, receiver));
 }
 
 pub fn init_sdk() {
-    let receiver = spawn_watcher();
-    spawn_processor(receiver);
+    let since = unsafe { FSEventsGetCurrentEventId() };
+    let receiver = spawn_watcher(since);
+    spawn_processor(since, receiver);
 }

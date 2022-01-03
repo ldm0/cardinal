@@ -43,6 +43,61 @@ cbindgen --config cbindgen.toml --crate cardinal --output cardinal.h
     },
 ]
 
+// Change README.md and save
+[
+    FsEvent {
+        path: "/Users/bytedance/code/cardinal/README.md",
+        flag: kFSEventStreamEventFlagItemInodeMetaMod | kFSEventStreamEventFlagItemModified | kFSEventStreamEventFlagItemIsFile,
+        id: 286980245,
+    },
+]
+
+// ln -s README.md readme
+[
+    FsEvent {
+        path: "/Users/bytedance/code/cardinal/readme",
+        flag: kFSEventStreamEventFlagItemCreated | kFSEventStreamEventFlagItemIsSymlink,
+        id: 286990858,
+    },
+]
+
+// rm readme (symlink)
+[
+    FsEvent {
+        path: "/Users/bytedance/code/cardinal/readme",
+        flag: kFSEventStreamEventFlagItemCreated | kFSEventStreamEventFlagItemRemoved | kFSEventStreamEventFlagItemIsSymlink,
+        id: 286993883,
+    },
+]
+
+// ln README.md readme
+[
+    FsEvent {
+        path: "/Users/bytedance/code/cardinal/readme",
+        flag: kFSEventStreamEventFlagItemCreated | kFSEventStreamEventFlagItemIsFile | kFSEventStreamEventFlagItemIsHardlink,
+        id: 286993132,
+    },
+    FsEvent {
+        path: "/Users/bytedance/code/cardinal",
+        flag: kFSEventStreamEventFlagItemInodeMetaMod | kFSEventStreamEventFlagItemIsDir,
+        id: 286993135,
+    },
+]
+
+// rm readme (hardlink)
+[
+    FsEvent {
+        path: "/Users/bytedance/code/cardinal/readme",
+        flag: kFSEventStreamEventFlagItemRemoved | kFSEventStreamEventFlagItemIsFile | kFSEventStreamEventFlagItemIsHardlink,
+        id: 286993483,
+    },
+]
+
+
+
+
+
+
 // mkdir target/tmp
 [
     FsEvent {
@@ -72,5 +127,14 @@ cbindgen --config cbindgen.toml --crate cardinal --output cardinal.h
         path: "/Users/bytedance/code/cardinal/target/emm",
         flag: kFSEventStreamEventFlagItemRenamed | kFSEventStreamEventFlagItemIsDir,
         id: 281061483,
+    },
+]
+
+// chmod 600 target/emm
+[
+    FsEvent {
+        path: "/Users/bytedance/code/cardinal/target/emm",
+        flag: kFSEventStreamEventFlagItemChangeOwner | kFSEventStreamEventFlagItemIsDir,
+        id: 286155411,
     },
 ]

@@ -1,5 +1,6 @@
 use crate::fsevent::FsEvent;
 use anyhow::{bail, Result};
+use fsevent_sys::FSEventStreamEventId;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use std::collections::BTreeSet;
@@ -48,7 +49,10 @@ pub fn take_fs_events() -> Vec<FsEvent> {
     fs_events
 }
 
-pub async fn processor(mut receiver: UnboundedReceiver<Vec<FsEvent>>) -> Result<()> {
+pub async fn processor(
+    since: FSEventStreamEventId,
+    mut receiver: UnboundedReceiver<Vec<FsEvent>>,
+) -> Result<()> {
     let mut core_paths = BTreeSet::new();
     while let Some(events) = receiver.recv().await {
         for event in events {

@@ -168,8 +168,7 @@ checksum = "398ea4fabe40b9b0d885340a2a991a44c8a645624075ad966d21f88688e2b69e"
 [[package]]
 name = "fsevent-sys"
 version = "4.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c0e564d24da983c053beff1bb7178e237501206840a3e6bf4e267b9e8ae734a"
+source = "git+https://github.com/ldm0/fsevent-rust?branch=more_apis#b7dcc850774e782d2a0207e780d525304a9a6a57"
 dependencies = [
  "libc",
 ]
