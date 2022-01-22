@@ -1,5 +1,6 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 mod c;
+pub mod fs_entry;
 mod fsevent;
 mod fsevent_flags;
 mod fsevent_pb;

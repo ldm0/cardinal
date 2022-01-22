@@ -8,7 +8,12 @@ Only paths are scanned and stored since fetching metadata is slow.
 
 ```
 cbindgen --config cbindgen.toml --crate cardinal --output cardinal.h
+
+cargo run --release --example tree
 ```
+
+Native GUI，cross platform core.
+Compressed BTree file system data on saved.
 
 // touch tmp.md(uncreated):
 [
