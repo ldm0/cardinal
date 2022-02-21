@@ -28,7 +28,7 @@ use fsevent_sys::{
     FSEventStreamScheduleWithRunLoop, FSEventStreamStart,
 };
 use runtime::runtime;
-use tracing::error;
+use tracing::{error, warn};
 
 use std::{ffi::c_void, ptr, slice};
 
@@ -64,7 +64,15 @@ impl EventStream {
                 .iter()
                 .zip(event_flags)
                 .zip(event_ids)
-                .map(|((&path, &flag), &id)| FsEvent::from_raw(path, flag, id))
+                .filter_map(
+                    |((&path, &flag), &id)| match FsEvent::from_raw(path, flag, id) {
+                        Ok(x) => Some(x),
+                        Err(error) => {
+                            warn!(?error, "bad fs event:");
+                            None
+                        }
+                    },
+                )
                 .collect();
 
             let callback = unsafe { (callback_info as *mut EventsCallback).as_mut() }.unwrap();

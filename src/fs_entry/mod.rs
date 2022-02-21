@@ -135,11 +135,11 @@ impl DiskEntry {
                 }
             }
         } else {
+            // `kFSEventStreamEventFlagItemRenamed` doesn't provide information about whether it's currently present, so modified unpresent file is acceptable.
             match event.flag {
                 EventFlag::Create | EventFlag::Modify => {
                     if matches!(event.flag, EventFlag::Modify) {
-                        // This should happen on racing. We are modifying an unpresent file.
-                        warn!(?event.path, "Modifying an unpresent file!");
+                        info!(?event.path, "Modifying an unpresent file");
                     }
 
                     // Fetching the metadata from fs, create the entry.

@@ -93,7 +93,7 @@ impl Processor {
 
     /// On new fs event.
     fn on_event(&self, event: FsEvent) -> Result<()> {
-        info!(?event, "new fs event");
+        info!(FSEvent = ?event);
         self.database
             .lock()
             .as_mut()
@@ -107,8 +107,8 @@ impl Processor {
     pub fn get_db(&self) -> Result<Database> {
         let db = match Database::from_fs(Path::new(DB_PATH)) {
             Ok(x) => x,
-            Err(e) => {
-                info!(?e, "Get db failed, try scanning.");
+            Err(error) => {
+                info!(?error, "Get db failed, try scanning.");
                 let mut partial_db = PartialDatabase::scan_fs();
                 info!("Fs scanning completes.");
                 while let Ok(event) = self.events_receiver.try_recv() {
@@ -135,6 +135,7 @@ impl Processor {
             .lock()
             .take()
             .context("Close uninit processor.")?;
+        info!("Start saving database");
         database
             .into_fs(Path::new(consts::DB_PATH))
             .context("Save database failed.")?;

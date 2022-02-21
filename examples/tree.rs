@@ -9,6 +9,7 @@ use tracing::info;
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt().with_env_filter("info").init();
+    /*
     info!("cardinal starts");
     let time = std::time::Instant::now();
     let hierarchy = DiskEntry::from_fs(Path::new("/"));
@@ -21,16 +22,10 @@ fn main() -> Result<()> {
     bincode::encode_into_std_write(hierarchy, &mut file, bincode::config::standard())
         .context("write hierarchy to file failed.")?;
     info!("elapsed: {}s", time.elapsed().as_secs_f32());
-
-    /*
-    cardinal::init_sdk();
-    loop {
-        std::thread::sleep(std::time::Duration::from_secs_f32(0.5));
-        let events = cardinal::take_fs_events();
-        if !events.is_empty() {
-            println!("{:#?}", events);
-        }
-    }
     */
+
+    cardinal::init_sdk_facade();
+    std::thread::sleep(std::time::Duration::from_secs_f32(500.));
+    cardinal::close_sdk_facade();
     Ok(())
 }

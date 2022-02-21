@@ -38,16 +38,42 @@ pub enum EventFlag {
 }
 
 impl TryFrom<MacEventFlag> for EventFlag {
-    type Error = ();
-    fn try_from(f: MacEventFlag) -> Result<Self, ()> {
+    type Error = MacEventFlag;
+    fn try_from(f: MacEventFlag) -> Result<Self, MacEventFlag> {
         if f.contains(MacEventFlag::kFSEventStreamEventFlagItemCreated) {
             Ok(EventFlag::Create)
-        } else if f.contains(MacEventFlag::kFSEventStreamEventFlagItemRemoved) {
+        } else if f.contains(MacEventFlag::kFSEventStreamEventFlagItemRemoved)
+            | f.contains(MacEventFlag::kFSEventStreamEventFlagUnmount)
+        {
             Ok(EventFlag::Delete)
-        } else if f.contains(MacEventFlag::kFSEventStreamEventFlagItemInodeMetaMod) {
+        } else if f.contains(MacEventFlag::kFSEventStreamEventFlagItemInodeMetaMod)
+            | f.contains(MacEventFlag::kFSEventStreamEventFlagItemXattrMod)
+            | f.contains(MacEventFlag::kFSEventStreamEventFlagItemChangeOwner)
+            | f.contains(MacEventFlag::kFSEventStreamEventFlagItemFinderInfoMod)
+            | f.contains(MacEventFlag::kFSEventStreamEventFlagItemModified)
+            // Nowhere to distinguish it's 'from' or 'to'.
+            | f.contains(MacEventFlag::kFSEventStreamEventFlagItemRenamed)
+            // Nowhere to distinguish it's 'from' or 'to'.
+            | f.contains(MacEventFlag::kFSEventStreamEventFlagItemCloned)
+        {
             Ok(EventFlag::Modify)
+        } else if f.contains(MacEventFlag::kFSEventStreamEventFlagMustScanSubDirs)
+            | f.contains(MacEventFlag::kFSEventStreamEventFlagUserDropped)
+            | f.contains(MacEventFlag::kFSEventStreamEventFlagKernelDropped)
+            | f.contains(MacEventFlag::kFSEventStreamEventFlagEventIdsWrapped)
+            // check the FSEvents.h it's implementation will be special
+            | f.contains(MacEventFlag::kFSEventStreamEventFlagMount)
+        {
+            todo!("TODO: need to rescan specific directory: {:?}", f);
+        } else if
+        // we are watching root, so this will never happen.
+        f.contains(MacEventFlag::kFSEventStreamEventFlagRootChanged)
+            // MarkSelf is not set on monitoring
+            | f.contains(MacEventFlag::kFSEventStreamEventFlagOwnEvent)
+        {
+            unreachable!()
         } else {
-            Err(())
+            Err(f)
         }
     }
 }
