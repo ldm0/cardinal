@@ -58,6 +58,7 @@ pub struct Metadata {
 
 impl From<fs::Metadata> for Metadata {
     fn from(meta: fs::Metadata) -> Self {
+        // unwrap is legal here since these things are always available on PC platforms.
         Self {
             file_type: meta.file_type().into(),
             len: meta.len(),
@@ -167,6 +168,7 @@ impl DiskEntry {
         }
     }
 
+    /// This function takes 400s+ on my mbp2019 512G. So don't use this function unless first boot.
     pub fn from_fs(path: &Path) -> DiskEntry {
         fn scan_folder(
             walker: &mut Peekable<DiskWalker>,
@@ -247,9 +249,10 @@ impl DiskWalker {
 }
 
 /// Get metadata of a path (without following the symlink). Return `Option<(filename, Option<filemeta>)>`
-/// When the file does not exist, return None.
-/// When the file is permission denied, return Some(filename, None).
-/// When the file is reachable, return `Some(filename, Some(filemeta))`.
+///
+/// - When the file does not exist, return None.
+/// - When the file is permission denied, return `Some(filename, None)`.
+/// - When the file is reachable, return `Some(filename, Some(filemeta))`.
 fn fs_metadata(path: &Path) -> Option<(&[u8], Option<Metadata>)> {
     match path.symlink_metadata() {
         Ok(metadata) => Some((

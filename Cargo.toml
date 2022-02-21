@@ -27,3 +27,4 @@ serde = { version = "1.0.135", features = ["derive"] }
 [dev-dependencies]
 serde_json = "1.0.78"
 tempfile = "3.3.0"
+tracing-subscriber = { version = "0.3.9", features = ["env-filter"] }

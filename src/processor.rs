@@ -87,6 +87,13 @@ impl Processor {
             .events_receiver
             .recv()
             .context("System events channel closed.")?;
+        self.on_event(event).context("process fs event failed.")?;
+        Ok(())
+    }
+
+    /// On new fs event.
+    fn on_event(&self, event: FsEvent) -> Result<()> {
+        info!(?event, "new fs event");
         self.database
             .lock()
             .as_mut()

@@ -145,18 +145,28 @@ pub fn close_event_processor() -> Result<()> {
     Ok(())
 }
 
-pub fn init_sdk() {
+pub fn init_sdk_facade() {
+    if let Err(error) = init_sdk() {
+        error!(?error, "init sdk failed");
+    }
+}
+
+pub fn close_sdk_facade() {
+    if let Err(error) = close_sdk() {
+        error!(?error, "close sdk failed")
+    }
+}
+
+fn init_sdk() -> Result<()> {
     let event_id = EventId::now();
     // A global event watcher spawned on a dedicated thread.
     let receiver = spawn_event_watcher(event_id.since);
     // A global event processor spawned on a dedicated thread.
-    if let Err(error) = spawn_event_processor(event_id, receiver) {
-        error!(?error, "spawn event processor failed")
-    }
+    spawn_event_processor(event_id, receiver).context("spawn event processor failed")?;
+    Ok(())
 }
 
-pub fn close_sdk() {
-    if let Err(error) = close_event_processor() {
-        error!(?error, "close event processor failed")
-    }
+fn close_sdk() -> Result<()> {
+    close_event_processor().context("close event processor failed")?;
+    Ok(())
 }
