@@ -121,8 +121,12 @@ impl Processor {
         Ok(db)
     }
 
-    pub fn block_on(&self) -> Result<()> {
-        *self.database.lock() = Some(self.get_db().context("Get db failed.")?);
+    pub fn block_on(&self, database: Option<Database>) -> Result<()> {
+        let database = match database {
+            Some(x) => x,
+            None => self.get_db().context("Get db failed.")?,
+        };
+        *self.database.lock() = Some(database);
         loop {
             self.process_event().context("processor is down.")?;
         }

@@ -9,6 +9,8 @@ mod runtime;
 mod utils;
 
 pub use c::*;
+use consts::DB_PATH;
+use database::Database;
 use fsevent::EventId;
 use fsevent::FsEvent;
 pub use processor::take_fs_events;
@@ -28,8 +30,9 @@ use fsevent_sys::{
     FSEventStreamScheduleWithRunLoop, FSEventStreamStart,
 };
 use runtime::runtime;
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
+use std::path::Path;
 use std::{ffi::c_void, ptr, slice};
 
 type EventsCallback = Box<dyn FnMut(Vec<FsEvent>) + Send>;
@@ -135,12 +138,16 @@ fn spawn_event_watcher(since: FSEventStreamEventId) -> Receiver<FsEvent> {
     receiver
 }
 
-fn spawn_event_processor(event_id: EventId, receiver: Receiver<FsEvent>) -> Result<()> {
+fn spawn_event_processor(
+    database: Option<Database>,
+    event_id: EventId,
+    receiver: Receiver<FsEvent>,
+) -> Result<()> {
     processor::PROCESSOR
         .set(Processor::new(event_id, receiver))
         .map_err(|_| anyhow!("Multiple initialization"))?;
     // unwrap is legal here since processor is always init.
-    runtime().spawn_blocking(|| processor::PROCESSOR.get().unwrap().block_on());
+    runtime().spawn_blocking(|| processor::PROCESSOR.get().unwrap().block_on(database));
     Ok(())
 }
 
@@ -166,11 +173,16 @@ pub fn close_sdk_facade() {
 }
 
 fn init_sdk() -> Result<()> {
+    let database = Database::from_fs(Path::new(DB_PATH));
+    if let Err(error) = &database {
+        info!(?error, "database not found");
+    }
+    let database = database.ok();
     let event_id = EventId::now();
     // A global event watcher spawned on a dedicated thread.
     let receiver = spawn_event_watcher(event_id.since);
     // A global event processor spawned on a dedicated thread.
-    spawn_event_processor(event_id, receiver).context("spawn event processor failed")?;
+    spawn_event_processor(database, event_id, receiver).context("spawn event processor failed")?;
     Ok(())
 }
 
