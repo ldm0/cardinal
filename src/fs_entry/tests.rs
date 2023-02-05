@@ -1,7 +1,5 @@
 use super::*;
 use pathbytes::b2p;
-use std::borrow::Borrow;
-use std::collections::BTreeSet;
 use std::fs::OpenOptions;
 use std::ops::{Deref, DerefMut};
 use std::{
@@ -14,17 +12,12 @@ use tempfile::TempDir;
 /// Compare two entries without comparing the create, accessed, modified time.
 /// Useful for manually testing.
 fn compare_test_entry(a: &DiskEntry, b: &DiskEntry) {
-    let a = a.borrow();
-    let b = b.borrow();
-    if a.name != b.name {
-        panic!("a: {:?} b: {:?}", b2p(&a.name), b2p(&b.name))
-    }
     if a.metadata.clone().map(|Metadata { file_type, len, .. }| {
         (file_type, if file_type == FileType::File { len } else { 0 })
     }) != b.metadata.clone().map(|Metadata { file_type, len, .. }| {
         (file_type, if file_type == FileType::File { len } else { 0 })
     }) {
-        panic!("a: {:?} b: {:?}", b2p(&a.name), b2p(&b.name))
+        panic!()
     }
     a.entries
         .iter()
@@ -42,9 +35,12 @@ fn metadata_dir() -> Metadata {
     }
 }
 
-fn entry_file(name: &[u8], len: u64) -> DiskEntry {
+fn entry_file_with_name(name: &[u8], len: u64) -> (Vec<u8>, DiskEntry) {
+    (name.to_vec(), entry_file(len))
+}
+
+fn entry_file(len: u64) -> DiskEntry {
     DiskEntry {
-        name: name.to_vec(),
         metadata: Some(Metadata {
             file_type: FileType::File,
             len,
@@ -54,22 +50,30 @@ fn entry_file(name: &[u8], len: u64) -> DiskEntry {
     }
 }
 
-fn entry_symlink(name: &[u8]) -> DiskEntry {
-    DiskEntry {
-        name: name.to_vec(),
-        metadata: Some(Metadata {
-            file_type: FileType::Symlink,
-            ..Default::default()
-        }),
-        entries: Default::default(),
-    }
+fn entry_symlink_with_name(name: &[u8]) -> (Vec<u8>, DiskEntry) {
+    (
+        name.to_vec(),
+        DiskEntry {
+            metadata: Some(Metadata {
+                file_type: FileType::Symlink,
+                ..Default::default()
+            }),
+            entries: Default::default(),
+        },
+    )
 }
 
-fn entry_folder<const N: usize>(name: &[u8], entries: [DiskEntry; N]) -> DiskEntry {
+fn entry_folder_with_name<const N: usize>(
+    name: &[u8],
+    entries: [(Vec<u8>, DiskEntry); N],
+) -> (Vec<u8>, DiskEntry) {
+    (name.to_vec(), entry_folder(entries))
+}
+
+fn entry_folder<const N: usize>(entries: [(Vec<u8>, DiskEntry); N]) -> DiskEntry {
     DiskEntry {
-        name: name.to_vec(),
         metadata: Some(metadata_dir()),
-        entries: entries.into_iter().map(|x| (x.name.clone(), x)).collect(),
+        entries: entries.into_iter().collect(),
     }
 }
 
@@ -110,19 +114,19 @@ fn complex_entry<P: AsRef<Path>>(path: P) -> ComplexEntry {
     let path = path.as_ref();
     ComplexEntry {
         base_dir: path.to_path_buf(),
-        entry: entry_folder(
-            p2b(path),
-            [
-                entry_folder(b"afolder", [entry_file(b"hello.txt", 666)]),
-                entry_file(b"233.txt", 233),
-                entry_file(b"445.txt", 445),
-                entry_file(b"heck.txt", 0),
-                entry_folder(
-                    b"src",
-                    [entry_folder(b"template", [entry_file(b"hello.java", 514)])],
-                ),
-            ],
-        ),
+        entry: entry_folder([
+            entry_folder_with_name(b"afolder", [entry_file_with_name(b"hello.txt", 666)]),
+            entry_file_with_name(b"233.txt", 233),
+            entry_file_with_name(b"445.txt", 445),
+            entry_file_with_name(b"heck.txt", 0),
+            entry_folder_with_name(
+                b"src",
+                [entry_folder_with_name(
+                    b"template",
+                    [entry_file_with_name(b"hello.java", 514)],
+                )],
+            ),
+        ]),
     }
 }
 
@@ -136,27 +140,27 @@ fn apply_complex_entry(path: &Path) {
     fs::write(path.join("src/template/hello.java"), vec![42; 514]).unwrap();
 }
 
-fn full_entry(path: &Path) -> DiskEntry {
-    entry_folder(
-        p2b(path),
-        [
-            entry_folder(
-                b"afolder",
-                [entry_file(b"foo", 666), entry_file(b"bar", 89)],
-            ),
-            entry_folder(
-                b"bfolder",
-                [
-                    entry_folder(b"cfolder", [entry_file(b"another", 0)]),
-                    entry_file(b"foo", 11),
-                    entry_file(b"bar", 0),
-                ],
-            ),
-            entry_file(b"abc", 233),
-            entry_file(b"ldm", 288),
-            entry_file(b"vvv", 12),
-        ],
-    )
+fn full_entry() -> DiskEntry {
+    entry_folder([
+        entry_folder_with_name(
+            b"afolder",
+            [
+                entry_file_with_name(b"foo", 666),
+                entry_file_with_name(b"bar", 89),
+            ],
+        ),
+        entry_folder_with_name(
+            b"bfolder",
+            [
+                entry_folder_with_name(b"cfolder", [entry_file_with_name(b"another", 0)]),
+                entry_file_with_name(b"foo", 11),
+                entry_file_with_name(b"bar", 0),
+            ],
+        ),
+        entry_file_with_name(b"abc", 233),
+        entry_file_with_name(b"ldm", 288),
+        entry_file_with_name(b"vvv", 12),
+    ])
 }
 
 fn apply_full_entry(path: &Path) {
@@ -191,7 +195,7 @@ fn entry_from_empty_folder() {
     let tempdir = TempDir::new().unwrap();
     let path = tempdir.path();
     let entry = DiskEntry::from_fs(path);
-    compare_test_entry(&entry_folder(p2b(path), []), &entry)
+    compare_test_entry(&entry_folder([]), &entry)
 }
 
 #[test]
@@ -201,7 +205,7 @@ fn entry_from_single_file() {
     let path = path.join("emm.txt");
     fs::write(&path, vec![42; 1000]).unwrap();
     let entry = DiskEntry::from_fs(&path);
-    compare_test_entry(&entry, &entry_file(p2b(&path), 1000));
+    compare_test_entry(&entry, &entry_file(1000));
 }
 
 #[test]
@@ -219,7 +223,7 @@ fn entry_from_full_folder() {
     let path = tempdir.path();
     apply_full_entry(path);
     let entry = DiskEntry::from_fs(path);
-    compare_test_entry(&entry, &full_entry(path));
+    compare_test_entry(&entry, &full_entry());
 }
 
 #[cfg(target_family = "unix")]
@@ -245,35 +249,32 @@ mod symlink_tests {
         unixfs::symlink(path.join("afolder/foo"), path.join("bfolder/foz")).unwrap();
     }
 
-    fn complex_entry_with_symlink(path: &Path) -> DiskEntry {
-        entry_folder(
-            p2b(path),
-            [
-                entry_folder(
-                    b"afolder",
-                    [
-                        entry_file(b"foo", 71),
-                        entry_file(b"bar", 0),
-                        entry_file(b"kksk", 121),
-                        entry_symlink(b"baz"),
-                    ],
-                ),
-                entry_symlink(b"dfolder"),
-                entry_folder(
-                    b"bfolder",
-                    [
-                        entry_folder(b"cfolder", [entry_file(b"another", 0)]),
-                        entry_file(b"foo", 0),
-                        entry_symlink(b"foz"),
-                        entry_file(b"bar", 0),
-                        entry_file(b"kksk", 188),
-                    ],
-                ),
-                entry_file(b"abc", 0),
-                entry_file(b"ldm", 0),
-                entry_file(b"vvv", 0),
-            ],
-        )
+    fn complex_entry_with_symlink() -> DiskEntry {
+        entry_folder([
+            entry_folder_with_name(
+                b"afolder",
+                [
+                    entry_file_with_name(b"foo", 71),
+                    entry_file_with_name(b"bar", 0),
+                    entry_file_with_name(b"kksk", 121),
+                    entry_symlink_with_name(b"baz"),
+                ],
+            ),
+            entry_symlink_with_name(b"dfolder"),
+            entry_folder_with_name(
+                b"bfolder",
+                [
+                    entry_folder_with_name(b"cfolder", [entry_file_with_name(b"another", 0)]),
+                    entry_file_with_name(b"foo", 0),
+                    entry_symlink_with_name(b"foz"),
+                    entry_file_with_name(b"bar", 0),
+                    entry_file_with_name(b"kksk", 188),
+                ],
+            ),
+            entry_file_with_name(b"abc", 0),
+            entry_file_with_name(b"ldm", 0),
+            entry_file_with_name(b"vvv", 0),
+        ])
     }
 
     #[test]
@@ -282,7 +283,7 @@ mod symlink_tests {
         let path = tempdir.path();
         create_complex_directory_with_symlink(path);
         let entry = DiskEntry::from_fs(path);
-        compare_test_entry(&entry, &complex_entry_with_symlink(path));
+        compare_test_entry(&entry, &complex_entry_with_symlink());
     }
 }
 
@@ -456,8 +457,11 @@ fn test_on_disk_entry_creating() {
     let mut expected = complex_entry(path);
     expected
         .entries
-        .insert(b"foobar.txt".to_vec(), entry_file(b"foobar.txt", 13));
-    let tmp_entry = entry_folder(b"fook", [entry_folder(b"barm", [entry_file(b"tmp", 10)])]);
+        .insert(b"foobar.txt".to_vec(), entry_file(13));
+    let tmp_entry = entry_folder([entry_folder_with_name(
+        b"barm",
+        [entry_file_with_name(b"tmp", 10)],
+    )]);
     expected.entries.insert(b"fook".to_vec(), tmp_entry);
 
     compare_test_entry(&entry.entry, &expected.entry);

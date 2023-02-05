@@ -57,18 +57,19 @@ struct ReadableDatabase {
 fn flatten_fs_entry(database: &Database) -> Result<ReadableDatabase> {
     let mut output = ReadableDatabase::default();
     output.time = database.time;
-    let path = b2p(&database.fs_entry.name);
+    let path = Path::new("/");
     inner(path, &database.fs_entry, &mut output);
     Ok(output)
 }
 
 /// prefix doesn't contains entry.name
 fn inner(prefix: &Path, entry: &DiskEntry, output: &mut ReadableDatabase) {
-    let prefix = prefix.join(b2p(&entry.name));
-    output
-        .nodes
-        .push((prefix.clone(), entry.metadata.as_ref().map(Into::into)));
+    output.nodes.push((
+        prefix.to_path_buf(),
+        entry.metadata.as_ref().map(Into::into),
+    ));
     for (name, entry) in entry.entries.iter() {
+        let prefix = prefix.join(b2p(name));
         inner(&prefix, entry, output);
     }
 }

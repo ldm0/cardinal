@@ -76,18 +76,15 @@ impl From<fs::Metadata> for Metadata {
     Serialize, Deserialize, Decode, Encode, Default, Clone, PartialEq, Eq, PartialOrd, Ord,
 )]
 pub struct DiskEntry {
-    /// WTF-8
-    pub name: Vec<u8>,
     /// Is None when no permission.
     pub metadata: Option<Metadata>,
-    /// Is set to Some when entry is a folder.
+    /// Is set to Some(path_seg(), entry) when entry is a folder,
     pub entries: BTreeMap<Vec<u8>, DiskEntry>,
 }
 
 impl DiskEntry {
-    fn new(name: &[u8], metadata: Option<Metadata>) -> Self {
+    fn new(metadata: Option<Metadata>) -> Self {
         Self {
-            name: name.to_vec(),
             metadata,
             entries: BTreeMap::default(),
         }
@@ -133,7 +130,8 @@ impl DiskEntry {
                     match event.flag {
                         EventFlag::Create | EventFlag::Modify | EventFlag::Delete => {
                             if let Some((name, metadata)) = fs_metadata(&event.path) {
-                                entry.insert(DiskEntry::new(name, metadata));
+                                debug_assert_eq!(name, o2b(seg));
+                                entry.insert(DiskEntry::new(metadata));
                             } else {
                                 entry.remove_entry();
                             }
@@ -147,7 +145,8 @@ impl DiskEntry {
                     // Now we filling the middle node.
                     current_dir.push(seg);
                     if let Some((name, metadata)) = fs_metadata(current_dir) {
-                        let entry = entry.insert(DiskEntry::new(name, metadata));
+                        debug_assert_eq!(name, o2b(seg));
+                        let entry = entry.insert(DiskEntry::new(metadata));
                         entry.merge_inner(event, current_dir, next_seg, path_segs);
                     } else {
                         debug!("But folder is not present: {:?}", current_dir);
@@ -158,7 +157,8 @@ impl DiskEntry {
                     match event.flag {
                         EventFlag::Create | EventFlag::Modify | EventFlag::Delete => {
                             if let Some((name, metadata)) = fs_metadata(&event.path) {
-                                entry.insert(DiskEntry::new(name, metadata));
+                                debug_assert_eq!(name, o2b(seg));
+                                entry.insert(DiskEntry::new(metadata));
                             }
                         }
                     }
@@ -191,16 +191,17 @@ impl DiskEntry {
                 // Should never panic since walkdir shouldn't emit same path twice.
                 assert_ne!(path, parent_path);
                 // Should never panic since root we are scanning after root.
-                let mut entry = DiskEntry::new(o2b(path.file_name().expect("root path")), metadata);
+                let name = o2b(path.file_name().unwrap());
+                let mut entry = DiskEntry::new(metadata);
                 scan_folder(walker, &path, &mut entry);
-                entries.insert(entry.name.clone(), entry);
+                entries.insert(name.to_vec(), entry);
             }
         }
 
         let mut walker = DiskWalker::new(path).peekable();
         let (root_path, metadata) = walker.next().unwrap();
         assert_eq!(root_path, path);
-        let mut entry = DiskEntry::new(p2b(path), metadata);
+        let mut entry = DiskEntry::new(metadata);
         scan_folder(&mut walker, path, &mut entry);
         entry
     }
