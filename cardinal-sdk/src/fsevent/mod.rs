@@ -1,9 +1,11 @@
 mod event_flag;
 mod event_id;
+mod event_stream;
 
 pub use event_flag::EventFlag;
 pub use event_flag::MacEventFlag;
 pub use event_id::EventId;
+pub use event_stream::spawn_event_watcher;
 
 use anyhow::{anyhow, Context, Result};
 use fsevent_sys::FSEventStreamEventId;
