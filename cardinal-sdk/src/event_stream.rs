@@ -2,7 +2,6 @@ use crate::fsevent::FsEvent;
 use anyhow::{bail, Result};
 use core_foundation::base::TCFType;
 use core_foundation::{array::CFArray, string::CFString};
-use crossbeam_channel::{unbounded, Receiver};
 use fsevent_sys::core_foundation::{kCFRunLoopDefaultMode, CFRunLoopGetCurrent, CFRunLoopRun};
 use fsevent_sys::{
     kFSEventStreamCreateFlagFileEvents, kFSEventStreamCreateFlagNoDefer, FSEventStreamContext,

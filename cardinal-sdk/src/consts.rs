@@ -9,3 +9,5 @@ pub const MAX_RAW_ENTRY_SIZE: usize = 5 * 1024 * 1024;
 pub const MAX_RAW_ENTRY_COUNT: usize =
     MAX_RAW_ENTRY_SIZE / std::mem::size_of::<DiskEntryRaw>() / CHUNK_SIZE;
 pub const CONFIG: bincode::config::Configuration = bincode::config::standard();
+
+pub const DATABASE_URL: &str = std::env!("DATABASE_URL");
