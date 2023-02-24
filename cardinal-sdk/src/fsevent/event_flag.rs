@@ -64,7 +64,7 @@ impl TryFrom<MacEventFlag> for EventFlag {
             // check the FSEvents.h it's implementation will be special
             | f.contains(MacEventFlag::kFSEventStreamEventFlagMount)
         {
-            todo!("TODO: need to rescan specific directory: {:?}", f);
+            Err(f)
         } else if
         // we are watching root, so this will never happen.
         f.contains(MacEventFlag::kFSEventStreamEventFlagRootChanged)

@@ -16,6 +16,7 @@ use diesel::prelude::*;
 use diesel_migrations::MigrationHarness;
 use fsevent_sys::FSEventStreamEventId;
 use pathbytes::p2b;
+use std::path::PathBuf;
 use std::time::Instant;
 use tracing::info;
 
@@ -153,6 +154,15 @@ impl CardinalDbConnection {
             })
             .context("Batch save entries failed.")
     }
+
+    fn fuzz_search(&mut self, filter: &str) -> Result<Vec<String>> {
+        use schema::dir_entrys::dsl::*;
+        dir_entrys
+            .select(the_path)
+            .filter(the_path.like(format!("%{}%", filter)))
+            .load(&mut self.conn)
+            .context("Fuzz search failed.")
+    }
 }
 
 /// The Database contains the file system snapshot and the time starting
@@ -211,5 +221,9 @@ impl Database {
         self.conn
             .save_event_id(&fs_event.id)
             .context("Save event id failed.")
+    }
+
+    pub fn search(&mut self, filter: &str) -> Result<Vec<String>> {
+        self.conn.fuzz_search(filter)
     }
 }

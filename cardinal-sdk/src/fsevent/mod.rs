@@ -33,6 +33,7 @@ impl FsEvent {
         let path = PathBuf::from(path);
         let flag = MacEventFlag::from_bits_truncate(flag);
         let flag = flag.try_into().map_err(|x| {
+            tracing::error!(?path, "bad fs event:");
             anyhow!(
                 "convert mac event flag to abstract event flag failed: {:?}",
                 x
