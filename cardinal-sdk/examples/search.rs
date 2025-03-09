@@ -2,7 +2,6 @@ use cardinal_sdk::database::Database;
 use cardinal_sdk::fsevent::FsEvent;
 use tracing::debug;
 use tracing::error;
-use tracing::info;
 
 #[tokio::main]
 async fn main() {

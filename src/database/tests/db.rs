@@ -5,16 +5,11 @@ use crate::fsevent::EventId;
 use anyhow::{Context, Result};
 use pathbytes::b2p;
 use serde::{Deserialize, Serialize};
-use std::fs::{self, File};
-use std::io::BufWriter;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
-use tokio::fs::ReadDir;
-use tokio::sync::oneshot;
-use tracing::info;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ReadableMetadata {
