@@ -1,18 +1,18 @@
 use crate::fsevent::FsEvent;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use core_foundation::base::TCFType;
 use core_foundation::{array::CFArray, string::CFString};
 use fsevent_sys::core_foundation::{
-    kCFRunLoopDefaultMode, CFRunLoopGetCurrent, CFRunLoopRun, CFTimeInterval,
+    CFRunLoopGetCurrent, CFRunLoopRun, CFTimeInterval, kCFRunLoopDefaultMode,
 };
 use fsevent_sys::{
-    kFSEventStreamCreateFlagFileEvents, kFSEventStreamCreateFlagNoDefer, FSEventStreamContext,
-    FSEventStreamCreate, FSEventStreamEventFlags, FSEventStreamEventId, FSEventStreamRef,
-    FSEventStreamScheduleWithRunLoop, FSEventStreamStart,
+    FSEventStreamContext, FSEventStreamCreate, FSEventStreamEventFlags, FSEventStreamEventId,
+    FSEventStreamRef, FSEventStreamScheduleWithRunLoop, FSEventStreamStart,
+    kFSEventStreamCreateFlagFileEvents, kFSEventStreamCreateFlagNoDefer,
 };
 use std::ptr;
 use std::{ffi::c_void, slice};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
+use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
 
 type EventsCallback = Box<dyn FnMut(Vec<FsEvent>) + Send>;
 

@@ -1,12 +1,6 @@
 extern crate cardinal;
 
 use anyhow::{Context, Result};
-use cardinal::fs_entry::DiskEntry;
-use std::fs::{self, File};
-use std::io::BufWriter;
-use std::mem::take;
-use std::path::Path;
-use std::time::Duration;
 use tokio::sync::oneshot;
 use tracing::info;
 

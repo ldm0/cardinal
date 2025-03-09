@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::BufWriter;
 use std::{io::BufReader, path::Path};
-use tracing::{info, instrument};
+use tracing::info;
 
 /// The overall database of Cardinal.
 ///
@@ -42,7 +42,7 @@ impl Database {
     }
 
     pub fn merge(&mut self, event: &FsEvent) {
-        if event.id < self.time.since {
+        if event.id < self.time.raw_event_id {
             info!("Ignore old event");
             return;
         }
@@ -52,7 +52,7 @@ impl Database {
 
     /// Return event_id of the last merged event.
     pub fn last_event_id(&self) -> u64 {
-        self.time.since
+        self.time.raw_event_id
     }
 }
 
@@ -82,7 +82,7 @@ impl PartialDatabase {
 
     pub fn merge(&mut self, event: &FsEvent) {
         info!(?event, "Merge event into partial db");
-        if event.id > self.time.since {
+        if event.id > self.time.raw_event_id {
             info!("Ignore old event");
             return;
         }

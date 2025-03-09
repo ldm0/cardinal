@@ -1,57 +1,40 @@
 //! Platform independent fs event processor.
-use crate::consts::{self, DB_PATH};
+use crate::consts::{self};
 use crate::database::{Database, PartialDatabase};
-use crate::fsevent::EventId;
-use crate::{fs_entry::DiskEntry, fsevent::FsEvent};
-use crate::{runtime, utils};
-
+use crate::fsevent::FsEvent;
 use anyhow::{Context, Result, bail};
 use crossbeam::channel::{self, Receiver, Sender, TryRecvError, TrySendError};
-use fsevent_sys::FSEventStreamEventId;
-use once_cell::sync::OnceCell;
+use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+use std::path::Path;
+use tokio::sync::mpsc::UnboundedReceiver;
 use tracing::info;
 
-use std::path::Path;
-use std::{collections::BTreeSet, path::PathBuf};
-
 /// The global event processor.
-pub static PROCESSOR: OnceCell<Processor> = OnceCell::new();
+pub static PROCESSOR: Processor = Processor;
+/// Bounded fs events FIFO pipe for displaying.
+pub static LIMITED_FS_EVENTS: Lazy<(Sender<FsEvent>, Receiver<FsEvent>)> =
+    Lazy::new(|| channel::bounded(Processor::FS_EVENTS_CHANNEL_LEN));
+/// File system Database .
+///
+/// It's initialized before event processing.
+/// It's dropped on application closed.
+pub static DATABASE: Lazy<Mutex<Option<Database>>> = Lazy::new(|| Mutex::new(None));
 
-pub struct Processor {
-    /// Raw fs events receiver channel from system.
-    events_receiver: Receiver<FsEvent>,
-
-    /// Bounded fs events FIFO pipe for displaying.
-    limited_fs_events: (Sender<FsEvent>, Receiver<FsEvent>),
-    /// File system Database .
-    ///
-    /// It's initialized before event processing.
-    /// It's dropped on application closed.
-    database: Mutex<Option<Database>>,
-}
+pub struct Processor;
 
 impl Processor {
     const FS_EVENTS_CHANNEL_LEN: usize = 1024;
-    pub fn new(events_receiver: Receiver<FsEvent>) -> Self {
-        let (sender, receiver) = channel::bounded(Self::FS_EVENTS_CHANNEL_LEN);
-        Self {
-            limited_fs_events: (sender, receiver),
-            events_receiver,
-            database: Mutex::new(None),
-        }
-    }
-
     /// Non blocking move fs_event in. If filled, it will drop oldest fs event
     /// repeatedly until a fs_event is pushed.
     fn fill_fs_event(&self, event: FsEvent) -> Result<()> {
         let mut event = Some(event);
         loop {
-            match self.limited_fs_events.0.try_send(event.take().unwrap()) {
+            match LIMITED_FS_EVENTS.0.try_send(event.take().unwrap()) {
                 Ok(()) => break,
                 Err(TrySendError::Disconnected(_)) => bail!("fs events channel closed!"),
                 Err(TrySendError::Full(give_back)) => {
-                    match self.limited_fs_events.1.try_recv() {
+                    match LIMITED_FS_EVENTS.1.try_recv() {
                         Ok(x) => drop(x),
                         Err(TryRecvError::Disconnected) => bail!("fs events channel disconnected"),
                         Err(TryRecvError::Empty) => {}
@@ -66,9 +49,9 @@ impl Processor {
     /// Take out fs_event cache of current processor.
     fn take_fs_events(&self) -> Vec<FsEvent> {
         // Due to non atomic channel recv, double the size of possible receiving vec.
-        let max_take_num = 2 * self.limited_fs_events.0.len();
+        let max_take_num = 2 * LIMITED_FS_EVENTS.0.len();
         let mut fs_events = Vec::with_capacity(max_take_num);
-        while let Ok(event) = self.limited_fs_events.1.try_recv() {
+        while let Ok(event) = LIMITED_FS_EVENTS.1.try_recv() {
             if fs_events.len() >= max_take_num {
                 break;
             }
@@ -78,19 +61,24 @@ impl Processor {
     }
 
     /// Non-blocking process a event.
-    pub fn process_event(&self) -> Result<()> {
-        let event = self
-            .events_receiver
+    pub async fn process_event(
+        &self,
+        events_receiver: &mut UnboundedReceiver<Vec<FsEvent>>,
+    ) -> Result<()> {
+        let events = events_receiver
             .recv()
+            .await
             .context("System events channel closed.")?;
-        self.on_event(event).context("process fs event failed.")?;
+        for event in events {
+            self.on_event(event).context("process fs event failed.")?;
+        }
         Ok(())
     }
 
     /// On new fs event.
     fn on_event(&self, event: FsEvent) -> Result<()> {
         info!(FSEvent = ?event);
-        self.database
+        DATABASE
             .lock()
             .as_mut()
             .context("Fs database closed")?
@@ -100,36 +88,46 @@ impl Processor {
         Ok(())
     }
 
-    pub fn get_db_from_fs(&self) -> Result<Database> {
+    pub async fn get_db_from_fs(
+        &self,
+        events_receiver: &mut UnboundedReceiver<Vec<FsEvent>>,
+    ) -> Result<Database> {
         info!("fs scanning starts.");
         let mut partial_db = PartialDatabase::scan_fs();
         info!("fs scanning completes.");
-        while let Ok(event) = self.events_receiver.try_recv() {
-            partial_db.merge(&event);
+        while let Ok(events) = events_receiver.try_recv() {
+            for event in events {
+                partial_db.merge(&event);
+            }
         }
         info!("Database construction completes.");
         let db = partial_db.complete_merge();
         Ok(db)
     }
 
-    pub fn block_on(&self, database: Option<Database>) -> Result<()> {
-        let database = match database {
-            Some(x) => x,
-            None => self.get_db_from_fs().context("Get db failed.")?,
+    pub async fn block_on(
+        &self,
+        database: Option<Database>,
+        events_receiver: &mut UnboundedReceiver<Vec<FsEvent>>,
+    ) -> Result<()> {
+        let database = if let Some(x) = database {
+            x
+        } else {
+            self.get_db_from_fs(events_receiver)
+                .await
+                .context("Get db failed.")?
         };
-        *self.database.lock() = Some(database);
+        *DATABASE.lock() = Some(database);
         loop {
-            self.process_event().context("processor is down.")?;
+            self.process_event(events_receiver)
+                .await
+                .context("processor is down.")?;
         }
     }
 
     pub fn close(&self) -> Result<()> {
         // Save and drop the database
-        let database = self
-            .database
-            .lock()
-            .take()
-            .context("Close uninit processor.")?;
+        let database = DATABASE.lock().take().context("Close uninit processor.")?;
         info!("Start saving database");
         database
             .into_fs(Path::new(consts::DB_PATH))
@@ -141,8 +139,5 @@ impl Processor {
 /// Get raw fs events from global processor. Capacity is limited due to the
 /// memory pressure, so only the first few(currently 1024) events will be provided.
 pub fn take_fs_events() -> Vec<FsEvent> {
-    PROCESSOR
-        .get()
-        .map(|x| x.take_fs_events())
-        .unwrap_or_default()
+    PROCESSOR.take_fs_events()
 }

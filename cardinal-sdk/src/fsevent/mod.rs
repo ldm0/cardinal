@@ -8,7 +8,6 @@ pub use event_flag::ScanType;
 pub use event_id::EventId;
 pub use event_stream::spawn_event_watcher;
 
-use anyhow::{anyhow, Context, Result};
 use fsevent_sys::FSEventStreamEventId;
 
 use std::{

@@ -1,25 +1,21 @@
 use crate::consts::*;
 use crate::disk_entry::DiskEntry;
 use crate::fs_visitor;
-use crate::fsevent::EventFlag;
 use crate::fsevent::EventId;
 use crate::fsevent::FsEvent;
-use crate::fsevent::MacEventFlag;
 use crate::fsevent::ScanType;
 use crate::models::DbMeta;
 use crate::models::DiskEntryRaw;
 use crate::schema;
-use anyhow::anyhow;
 use anyhow::Context;
 use anyhow::Result;
+use anyhow::anyhow;
 use crossbeam_channel::bounded;
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel_migrations::MigrationHarness;
 use fsevent_sys::FSEventStreamEventId;
-use pathbytes::p2b;
 use std::path::Path;
-use std::path::PathBuf;
 use std::time::Instant;
 use tracing::info;
 

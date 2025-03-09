@@ -5,22 +5,19 @@ use crate::fsevent::{EventFlag, FsEvent};
 
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
-use std::ffi::{OsStr, OsString};
-use std::io::{self, BufWriter};
+use std::ffi::OsStr;
+use std::io::{self};
 use std::iter::Peekable;
 use std::{
-    fs::{self, File},
-    io::BufReader,
-    io::prelude::*,
+    fs::{self},
     path::{Path, PathBuf},
     time::SystemTime,
 };
 
-use anyhow::{Context, Result};
-use bincode::{Decode, Encode, config::Configuration};
-use pathbytes::{b2p, o2b, p2b};
+use bincode::{Decode, Encode};
+use pathbytes::o2b;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 use walkdir::{DirEntry, IntoIter, WalkDir};
 
 #[derive(
@@ -97,13 +94,14 @@ impl DiskEntry {
             .path
             .strip_prefix(&base_dir)
             .expect("event path doesn't share a common prefix with the root.");
-        // TODO: remove this peekable
         let mut path_segs = event_path.into_iter().peekable();
-        // Ensure we are not modifying the root. (When this feature is really
-        // needed, add a match branch here for special-case this).
-        let seg = path_segs.next().unwrap();
-        let mut current_dir = base_dir;
-        self.merge_inner(event, &mut current_dir, seg, path_segs);
+        // Ensure we are not modifying the root.
+        if let Some(seg) = path_segs.next() {
+            let mut current_dir = base_dir;
+            self.merge_inner(event, &mut current_dir, seg, path_segs);
+        } else {
+            info!("event path on root: {:?}", event);
+        }
     }
 
     /// The `path_segs.next()` is ensured to be `Some`, it's the path segment we
@@ -117,6 +115,13 @@ impl DiskEntry {
     ) {
         let next_seg = path_segs.next();
         let entry = self.entries.entry(o2b(seg).to_vec());
+        let flag = match event.flag.try_into() {
+            Ok(flag) => flag,
+            Err(e) => {
+                warn!("unreckonized event flag: {:?}", e);
+                return;
+            }
+        };
         match entry {
             Entry::Occupied(mut entry) => {
                 if let Some(next_seg) = next_seg {
@@ -128,7 +133,7 @@ impl DiskEntry {
                     current_dir.pop();
                 } else {
                     // leaf node
-                    match event.flag {
+                    match flag {
                         EventFlag::Create | EventFlag::Modify | EventFlag::Delete => {
                             if let Some((name, metadata)) = fs_metadata(&event.path) {
                                 debug_assert_eq!(name, o2b(seg));
@@ -155,7 +160,7 @@ impl DiskEntry {
                     current_dir.pop();
                 } else {
                     // leaf node, just insert it to the entry if it's present
-                    match event.flag {
+                    match flag {
                         EventFlag::Create | EventFlag::Modify | EventFlag::Delete => {
                             if let Some((name, metadata)) = fs_metadata(&event.path) {
                                 debug_assert_eq!(name, o2b(seg));

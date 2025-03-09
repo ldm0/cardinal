@@ -1,7 +1,6 @@
 use crate::consts::CONFIG;
 use crate::models::DiskEntryRaw;
 use bincode::{Decode, Encode};
-use pathbytes::{b2p, p2b};
 use std::fs;
 use std::{path::PathBuf, time::SystemTime};
 

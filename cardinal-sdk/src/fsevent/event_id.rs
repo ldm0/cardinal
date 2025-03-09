@@ -2,9 +2,24 @@ use crate::utils;
 use bincode::Decode;
 use bincode::Encode;
 use fsevent_sys::FSEventStreamEventId;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// A event id for event ordering.
-#[derive(Debug, Default, Clone, Copy, Decode, Encode, PartialOrd, PartialEq, Eq, Ord)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialOrd,
+    PartialEq,
+    Eq,
+    Ord,
+    Decode,
+    Encode,
+    Serialize,
+    Deserialize,
+)]
 pub struct EventId {
     pub raw_event_id: FSEventStreamEventId,
     pub timestamp: i64,

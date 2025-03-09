@@ -1,14 +1,5 @@
-mod consts;
-mod database;
-mod disk_entry;
-mod fs_visitor;
-mod fsevent;
-mod models;
-mod schema;
-mod utils;
-
-use database::Database;
-use fsevent::FsEvent;
+use cardinal_sdk::database::Database;
+use cardinal_sdk::fsevent::FsEvent;
 use tracing::debug;
 use tracing::error;
 use tracing::info;
@@ -18,7 +9,7 @@ async fn main() {
     tracing_subscriber::fmt().with_env_filter("debug").init();
     // let _ = std::fs::remove_file(DATABASE_URL);
     let mut db = Database::from_fs().unwrap();
-    let mut receiver = fsevent::spawn_event_watcher(db.event_id);
+    let mut receiver = cardinal_sdk::fsevent::spawn_event_watcher(db.event_id);
     let (filter_tx, mut filter_rx) = tokio::sync::mpsc::unbounded_channel();
     let (result_tx, mut result_rx) = tokio::sync::mpsc::unbounded_channel();
     tokio::spawn(async move {

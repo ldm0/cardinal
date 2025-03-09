@@ -1,5 +1,5 @@
 use crate::models::DiskEntryRaw;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations};
+use diesel_migrations::{EmbeddedMigrations, embed_migrations};
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../migrations");
 pub const CONNECTION_PRAGMAS: &str =
@@ -10,4 +10,4 @@ pub const MAX_RAW_ENTRY_COUNT: usize =
     MAX_RAW_ENTRY_SIZE / std::mem::size_of::<DiskEntryRaw>() / CHUNK_SIZE;
 pub const CONFIG: bincode::config::Configuration = bincode::config::standard();
 
-pub const DATABASE_URL: &str = std::env!("DATABASE_URL");
+pub const DATABASE_URL: &str = "target/cardinal.db"; // std::env!("DATABASE_URL");
