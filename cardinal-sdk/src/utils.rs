@@ -1,6 +1,6 @@
 use fsevent_sys::{FSEventsGetCurrentEventId, FSEventsGetLastEventIdForDeviceBeforeTime};
 use libc::dev_t;
-use std::{ffi::CStr, mem::MaybeUninit};
+use std::{cell::RefCell, collections::HashMap, ffi::CStr, mem::MaybeUninit};
 
 pub fn current_timestamp() -> i64 {
     time::OffsetDateTime::now_utc().unix_timestamp()
@@ -19,12 +19,39 @@ pub fn dev_of_path(path: &CStr) -> std::io::Result<dev_t> {
     Ok(unsafe { stat.assume_init().st_dev })
 }
 
+pub fn last_event_id_before_time(dev: dev_t, timestamp: i64) -> u64 {
+    // TODO(ldm0): Vec<dev_t, HashMap>, HashMap -> FifoMap
+    thread_local! {
+        static DEV: RefCell<Option<dev_t>> = RefCell::new(None);
+        static CACHE: RefCell<HashMap<i64, u64>> = RefCell::new(HashMap::new());
+    }
+    DEV.with(|dev_cache| {
+        let mut dev_cache = dev_cache.borrow_mut();
+        if dev_cache.is_none() {
+            *dev_cache = Some(dev)
+        } else {
+            assert_eq!(*dev_cache, Some(dev));
+        }
+    });
+    CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some(&event_id) = cache.get(&timestamp) {
+            event_id
+        } else {
+            let event_id =
+                unsafe { FSEventsGetLastEventIdForDeviceBeforeTime(dev, timestamp as f64) };
+            cache.insert(timestamp, event_id);
+            event_id
+        }
+    })
+}
+
 pub fn event_id_to_timestamp(dev: dev_t, event_id: u64) -> i64 {
     let mut begin = 0i64;
     let mut end = current_timestamp();
     loop {
         let mid = (begin + end) / 2;
-        let mid_event_id = unsafe { FSEventsGetLastEventIdForDeviceBeforeTime(dev, mid as f64) };
+        let mid_event_id = last_event_id_before_time(dev, mid);
         if mid == begin || mid == end {
             return mid;
         }
