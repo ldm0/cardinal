@@ -365,12 +365,12 @@ fn test_on_disk_entry_modifying() {
     let mut entry = ComplexEntry::from_fs(path);
     entry.merge(&FsEvent {
         path: path.join("445.txt"),
-        flag: MacEventFlag::kFSEventStreamEventFlagItemModified,
+        flag: MacEventFlag::ItemModified,
         id: 0,
     });
     entry.merge(&FsEvent {
         path: path.join("src/template/hello.java"),
-        flag: MacEventFlag::kFSEventStreamEventFlagItemModified,
+        flag: MacEventFlag::ItemModified,
         id: 0,
     });
     let x = entry.entries.get(&b"445.txt".to_vec()).unwrap();
@@ -408,12 +408,12 @@ fn test_on_disk_entry_deleting() {
     let mut entry = ComplexEntry::from_fs(path);
     entry.merge(&FsEvent {
         path: path.join("445.txt"),
-        flag: MacEventFlag::kFSEventStreamEventFlagItemRemoved,
+        flag: MacEventFlag::ItemRemoved,
         id: 0,
     });
     entry.merge(&FsEvent {
         path: path.join("src/template"),
-        flag: MacEventFlag::kFSEventStreamEventFlagItemRemoved,
+        flag: MacEventFlag::ItemRemoved,
         id: 0,
     });
 
@@ -446,12 +446,12 @@ fn test_on_disk_entry_creating() {
     let mut entry = ComplexEntry::from_fs(path);
     entry.merge(&FsEvent {
         path: path.join("foobar.txt"),
-        flag: MacEventFlag::kFSEventStreamEventFlagItemCreated,
+        flag: MacEventFlag::ItemCreated,
         id: 0,
     });
     entry.merge(&FsEvent {
         path: path.join("fook/barm/tmp"),
-        flag: MacEventFlag::kFSEventStreamEventFlagItemCreated,
+        flag: MacEventFlag::ItemCreated,
         id: 0,
     });
 
