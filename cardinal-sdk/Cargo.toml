@@ -28,3 +28,9 @@ tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 core-foundation = { version = "0.9.2", features = ["mac_os_10_8_features"] }
 dispatch2 = { version = "0.2.0", default-features = true, features = ["alloc"] }
 libc = "0.2.171"
+rayon = "1"
+cbor4ii = { version = "1.0.0", features = ["serde1", "use_std"] }
+
+[dev-dependencies]
+serde_json = "1"
+zstd = "0.13"

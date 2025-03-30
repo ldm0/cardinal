@@ -1,6 +1,7 @@
 pub mod consts;
 pub mod database;
 pub mod disk_entry;
+pub mod fs_visit;
 pub mod fs_visitor;
 pub mod fsevent;
 pub mod models;
