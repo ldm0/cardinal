@@ -5,14 +5,17 @@ use std::{
     fs,
     io::Error,
     path::PathBuf,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
-#[derive(Serialize, Encode)]
+#[derive(Serialize, Encode, Debug)]
 pub struct Node {
     pub name: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub children: Vec<Node>,
+    pub children: Vec<Arc<Node>>,
 }
 
 #[derive(Debug)]
@@ -67,6 +70,7 @@ fn walk(dir: PathBuf, walk_data: &WalkData, depth: usize) -> Option<Node> {
                     }
                     None
                 })
+                .map(Arc::new)
                 .collect(),
             Err(failed) => {
                 if handle_error_and_retry(&failed) {
