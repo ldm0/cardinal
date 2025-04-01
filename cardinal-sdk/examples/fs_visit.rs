@@ -29,7 +29,7 @@ impl NamePool {
         start
     }
 
-    pub fn get(&self, offset: usize) -> &str {
+    fn get(&self, offset: usize) -> &str {
         let begin = self.pool[..offset]
             .iter()
             .rposition(|&x| x == 0)
@@ -62,7 +62,7 @@ fn construct_trie_and_namepool(
         if let Some(nodes) = node_trie.get_mut(&child.name) {
             nodes.push(child.clone());
         } else {
-            name_pool.push(&node.name);
+            name_pool.push(&child.name);
             node_trie.insert(child.name.clone(), vec![child.clone()]);
         };
         for grandchild in &child.children {
@@ -88,10 +88,10 @@ fn main() {
         dbg!(node_trie.len());
 
         let search_time = Instant::now();
-        for name in name_pool.search_substr("athbyt") {
+        for (i, name) in name_pool.search_substr("athbyt").enumerate() {
             if let Some(subtrie) = node_trie.subtrie(name) {
                 for (key, _) in subtrie.iter() {
-                    println!("Key: {}", key);
+                    println!("[{}] key: {}", i, key);
                 }
             }
         }
