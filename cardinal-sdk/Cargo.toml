@@ -8,7 +8,6 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.69"
 bincode = "2.0.0"
-rand = "0.8.5"
 walkdir = "2.3.2"
 diesel = { version = "2.0.0", features = ["sqlite"] }
 diesel_migrations = { version = "2.0.0", features = ["sqlite"] }
@@ -18,24 +17,20 @@ ignore = "0.4.20"
 once_cell = { version = "1.17.1", features = ["parking_lot"] }
 num_cpus = "1.15.0"
 serde = { version = "1", features = ["derive", "rc"] }
-pathbytes = { path = "../pathbytes" }
 bitflags = "2.9.0"
 # fsevent-sys = "4.1.0"
 fsevent-sys.git = "https://github.com/ldm0/fsevent-rust"
 time = "0.3.19"
 tracing = "0.1.37"
-tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 core-foundation = { version = "0.9.2", features = ["mac_os_10_8_features"] }
 dispatch2 = { version = "0.2.0", default-features = true, features = ["alloc"] }
 libc = "0.2.171"
 rayon = "1"
-cbor4ii = { version = "1.0.0", features = ["serde1", "use_std"] }
-radix_trie = "0.2.1"
 memchr = "2.7.4"
-rustc-hash = "2.1.1"
-mimalloc = "0.1.44"
-slab = { git = "https://github.com/ldm0/slab", branch = "bincode_support", features = ["serde", "bincode"] }
 
 [dev-dependencies]
-serde_json = "1"
+tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+cbor4ii = { version = "1.0.0", features = ["serde1", "use_std"] }
+mimalloc = "0.1.44"
+slab = { git = "https://github.com/ldm0/slab", branch = "bincode_support", features = ["serde", "bincode"] }
 zstd = "0.13"
