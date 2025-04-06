@@ -1,4 +1,5 @@
-use bincode::{Decode, Encode};
+use anyhow::{Context, Result};
+use bincode::{Decode, Encode, config::Configuration};
 use clap::Parser;
 use fswalk::{Node, WalkData, walk_it};
 use namepool::NamePool;
@@ -7,8 +8,9 @@ use slab::Slab;
 use std::{
     collections::BTreeMap,
     fs::{self, File, Metadata},
-    io::{BufWriter, Write},
-    path::PathBuf,
+    io::{BufReader, BufWriter, Write},
+    path::{Path, PathBuf},
+    thread::available_parallelism,
     time::{Instant, UNIX_EPOCH},
 };
 
@@ -87,16 +89,12 @@ fn construct_node_slab(parent: Option<usize>, node: &Node, slab: &mut Slab<SlabN
 
 /// Combine the construction routine of NamePool and BTreeMap since we can deduplicate node name for free.
 // TODO(ldm0): Memory optimization can be done by letting name index reference the name in the pool(gc need to be considered though)
-fn construct_name_index_and_namepool(
-    slab: &Slab<SlabNode>,
-    name_index: &mut BTreeMap<String, Vec<usize>>,
-    name_pool: &mut NamePool,
-) {
+fn construct_name_index(slab: &Slab<SlabNode>, name_index: &mut BTreeMap<String, Vec<usize>>) {
+    // The slab is newly constructed, thus though slab.iter() iterates all slots, it won't waste too much.
     for (i, node) in slab.iter() {
         if let Some(nodes) = name_index.get_mut(&node.name) {
             nodes.push(i);
         } else {
-            name_pool.push(&node.name);
             name_index.insert(node.name.clone(), vec![i]);
         };
     }
@@ -128,29 +126,62 @@ fn walkfs_to_slab() -> (usize, Slab<SlabNode>) {
     (slab_root, slab)
 }
 
-fn name_index_and_pool(slab: &Slab<SlabNode>) -> (BTreeMap<String, Vec<usize>>, NamePool) {
+fn name_index(slab: &Slab<SlabNode>) -> BTreeMap<String, Vec<usize>> {
     let name_index_time = Instant::now();
     let mut name_index = BTreeMap::default();
-    let mut name_pool = NamePool::new();
-    construct_name_index_and_namepool(&slab, &mut name_index, &mut name_pool);
+    construct_name_index(&slab, &mut name_index);
     dbg!(name_index_time.elapsed());
     println!("name index len: {}", name_index.len());
+    name_index
+}
+
+fn name_pool(name_index: &BTreeMap<String, Vec<usize>>) -> NamePool {
+    let name_pool_time = Instant::now();
+    let mut name_pool = NamePool::new();
+    for name in name_index.keys() {
+        name_pool.push(name);
+    }
+    dbg!(name_pool_time.elapsed());
     println!("name pool size: {}MB", name_pool.len() / 1024 / 1024);
-    (name_index, name_pool)
+    name_pool
 }
 
 #[derive(Encode, Decode)]
 struct PersistentStorage {
-    slab_root: usize,
+    // slab_root: usize,
     slab: Slab<SlabNode>,
     name_index: BTreeMap<String, Vec<usize>>,
-    name_pool: NamePool,
 }
+
+const CACHE_PATH: &str = "target/cache.zstd";
+const BINCODE_CONDFIG: Configuration = bincode::config::standard();
 
 fn main() {
     let cli = Cli::parse();
-    let (slab_root, slab) = walkfs_to_slab();
-    let (name_index, name_pool) = name_index_and_pool(&slab);
+    let (slab, name_index) = if cli.refresh || !Path::new(CACHE_PATH).exists() {
+        let (_slab_root, slab) = walkfs_to_slab();
+        let name_index = name_index(&slab);
+        (slab, name_index)
+    } else {
+        let read_cache = || -> Result<_> {
+            let cache_decode_time = Instant::now();
+            let input = File::open(CACHE_PATH).context("Failed to open cache file")?;
+            let input = zstd::Decoder::new(input).context("Failed to create zstd decoder")?;
+            let mut input = BufReader::new(input);
+            let slab: PersistentStorage =
+                bincode::decode_from_std_read(&mut input, BINCODE_CONDFIG)
+                    .context("Failed to decode cache")?;
+            dbg!(cache_decode_time.elapsed());
+            Ok((slab.slab, slab.name_index))
+        };
+        read_cache().unwrap_or_else(|e| {
+            eprintln!("Failed to read cache: {:?}", e);
+            let (_slab_root, slab) = walkfs_to_slab();
+            let name_index = name_index(&slab);
+            (slab, name_index)
+        })
+    };
+    let name_pool = name_pool(&name_index);
 
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
@@ -183,20 +214,21 @@ fn main() {
     }
 
     {
-        let bincode_time = Instant::now();
-        let output = File::create("target/tree.bin").unwrap();
+        let cache_encode_time = Instant::now();
+        let output = File::create(CACHE_PATH).unwrap();
+        let mut output = zstd::Encoder::new(output, 6).unwrap();
+        output
+            .multithread(available_parallelism().map(|x| x.get() as u32).unwrap_or(4))
+            .unwrap();
+        let output = output.auto_finish();
         let mut output = BufWriter::new(output);
-        bincode::encode_into_std_write(&slab, &mut output, bincode::config::standard()).unwrap();
-        dbg!(bincode_time.elapsed());
-        dbg!(fs::metadata("target/tree.bin").unwrap().len() / 1024 / 1024);
-    }
-
-    {
-        let zstd_bincode_time = Instant::now();
-        let output = File::create("target/tree.bin.zstd").unwrap();
-        let mut output = zstd::Encoder::new(output, 3).unwrap();
-        bincode::encode_into_std_write(&slab, &mut output, bincode::config::standard()).unwrap();
-        dbg!(zstd_bincode_time.elapsed());
-        dbg!(fs::metadata("target/tree.bin.zstd").unwrap().len() / 1024 / 1024);
+        bincode::encode_into_std_write(
+            &PersistentStorage { slab, name_index },
+            &mut output,
+            BINCODE_CONDFIG,
+        )
+        .unwrap();
+        dbg!(cache_encode_time.elapsed());
+        dbg!(fs::metadata(CACHE_PATH).unwrap().len() / 1024 / 1024);
     }
 }

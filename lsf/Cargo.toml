@@ -7,7 +7,8 @@ edition = "2024"
 fswalk.path = "../fswalk"
 namepool.path = "../namepool"
 bincode = "2"
-zstd = "0.13"
+zstd = { version = "0.13", features = ["zstdmt"] }
 serde = { version = "1", features = ["derive"] }
 slab = { git = "https://github.com/ldm0/slab", branch = "bincode_support", features = ["serde", "bincode"] }
 clap = { version = "4", features = ["derive"] }
+anyhow = "1.0.97"
