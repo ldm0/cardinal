@@ -55,7 +55,10 @@ impl NamePool {
         })
     }
 
-    pub fn search_subslice<'a>(&'a self, subslice: &'a [u8]) -> impl Iterator<Item = &'a str> + 'a {
+    pub fn search_subslice<'search, 'pool: 'search>(
+        &'pool self,
+        subslice: &'search [u8],
+    ) -> impl Iterator<Item = &'pool str> + 'search {
         let mut last_end = 0;
         memchr::memmem::find_iter(&self.pool, subslice).filter_map(move |x| {
             (x > last_end).then(|| {
@@ -66,7 +69,10 @@ impl NamePool {
         })
     }
 
-    pub fn search_suffix<'a>(&'a self, suffix: &'a CStr) -> impl Iterator<Item = &'a str> + 'a {
+    pub fn search_suffix<'search, 'pool: 'search>(
+        &'pool self,
+        suffix: &'search CStr,
+    ) -> impl Iterator<Item = &'pool str> + 'search {
         let mut last_end = 0;
         memchr::memmem::find_iter(&self.pool, suffix.to_bytes_with_nul()).filter_map(move |x| {
             (x > last_end).then(|| {
@@ -78,7 +84,10 @@ impl NamePool {
     }
 
     // prefix should starts with a \0, e.g. b"\0hello"
-    pub fn search_prefix<'a>(&'a self, prefix: &'a [u8]) -> impl Iterator<Item = &'a str> + 'a {
+    pub fn search_prefix<'search, 'pool: 'search>(
+        &'pool self,
+        prefix: &'search [u8],
+    ) -> impl Iterator<Item = &'pool str> + 'search {
         assert_eq!(prefix[0], 0);
         let mut last_end = 0;
         memchr::memmem::find_iter(&self.pool, prefix)
@@ -95,7 +104,10 @@ impl NamePool {
 
     // `exact` should starts with a '\0', and ends with a '\0',
     // e.g. b"\0hello\0"
-    pub fn search_exact<'a>(&'a self, exact: &'a [u8]) -> impl Iterator<Item = &'a str> + 'a {
+    pub fn search_exact<'search, 'pool: 'search>(
+        &'pool self,
+        exact: &'search [u8],
+    ) -> impl Iterator<Item = &'pool str> + 'search {
         assert_eq!(exact[0], 0);
         assert_eq!(exact[exact.len() - 1], 0);
         memchr::memmem::find_iter(&self.pool, exact).map(|x| {

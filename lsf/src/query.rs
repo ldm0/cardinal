@@ -22,7 +22,7 @@ pub fn query_segmentation(query: &str) -> Vec<Segment<'_>> {
         Substr,
         Prefix,
         Suffix,
-        Exact
+        Exact,
     }
     let left_close = query.starts_with('/');
     let right_close = query.ends_with('/');
@@ -63,14 +63,16 @@ pub fn query_segmentation(query: &str) -> Vec<Segment<'_>> {
         }
         states
     };
-    states.into_iter().zip(segments.into_iter()).map(|(state, segment)| {
-        match state {
+    states
+        .into_iter()
+        .zip(segments.into_iter())
+        .map(|(state, segment)| match state {
             State::Substr => Segment::Substr(segment),
             State::Prefix => Segment::Prefix(segment),
             State::Suffix => Segment::Suffix(segment),
             State::Exact => Segment::Exact(segment),
-        }
-    }).collect()
+        })
+        .collect()
 }
 #[cfg(test)]
 mod tests {
@@ -82,18 +84,9 @@ mod tests {
             query_segmentation("elloworl"),
             vec![Segment::Substr("elloworl")]
         );
-        assert_eq!(
-            query_segmentation("/root"),
-            vec![Segment::Prefix("root")]
-        );
-        assert_eq!(
-            query_segmentation("root/"),
-            vec![Segment::Suffix("root")]
-        );
-        assert_eq!(
-            query_segmentation("/root/"),
-            vec![Segment::Exact("root")]
-        );
+        assert_eq!(query_segmentation("/root"), vec![Segment::Prefix("root")]);
+        assert_eq!(query_segmentation("root/"), vec![Segment::Suffix("root")]);
+        assert_eq!(query_segmentation("/root/"), vec![Segment::Exact("root")]);
         assert_eq!(
             query_segmentation("/root/bar"),
             vec![Segment::Exact("root"), Segment::Prefix("bar")]
@@ -148,32 +141,17 @@ mod tests {
         assert_eq!(query_segmentation("///"), vec![]);
 
         // Leading and trailing slashes
-        assert_eq!(
-            query_segmentation("/a/"),
-            vec![Segment::Exact("a")]
-        );
+        assert_eq!(query_segmentation("/a/"), vec![Segment::Exact("a")]);
 
         // Single character
-        assert_eq!(
-            query_segmentation("a"),
-            vec![Segment::Substr("a")]
-        );
+        assert_eq!(query_segmentation("a"), vec![Segment::Substr("a")]);
 
         // Single character with slash
-        assert_eq!(
-            query_segmentation("/a"),
-            vec![Segment::Prefix("a")]
-        );
-        assert_eq!(
-            query_segmentation("a/"),
-            vec![Segment::Suffix("a")]
-        );
+        assert_eq!(query_segmentation("/a"), vec![Segment::Prefix("a")]);
+        assert_eq!(query_segmentation("a/"), vec![Segment::Suffix("a")]);
 
         // Mixed slashes and empty segments
-        assert_eq!(
-            query_segmentation("/a//b/"),
-            vec![]
-        );
+        assert_eq!(query_segmentation("/a//b/"), vec![]);
 
         // Long string without slashes
         assert_eq!(

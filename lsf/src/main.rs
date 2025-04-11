@@ -5,6 +5,7 @@ use bincode::{Decode, Encode, config::Configuration};
 use clap::Parser;
 use fswalk::{Node, WalkData, walk_it};
 use namepool::NamePool;
+use query::{Segment, query_segmentation};
 use serde::{Deserialize, Serialize};
 use slab::Slab;
 use std::{
@@ -16,7 +17,6 @@ use std::{
     thread::available_parallelism,
     time::{Instant, UNIX_EPOCH},
 };
-use query::query_segmentation;
 
 #[derive(Serialize, Deserialize, Encode, Decode)]
 struct SlabNode {
@@ -202,58 +202,66 @@ fn main() -> Result<()> {
             break;
         }
         if line.contains('/') {
-            let segments: Vec<_> = line.split('/').collect();
-            match &*segments {
-                ["", "", ..] => {
-                    eprintln!("bad query: {:?}", segments);
-                    continue;
-                }
-                // "/<first>"
-                ["", prefix] => {
-                    let search_time = Instant::now();
-                    let mut buffer = vec![0u8];
-                    buffer.extend_from_slice(prefix.as_bytes());
-                    for (i, name) in name_pool.search_prefix(&buffer).enumerate() {
-                        if let Some(nodes) = name_index.get(name) {
-                            for &node in nodes {
-                                println!("[{}] {}", i, slab[node].path(&slab));
+            let segments = query_segmentation(line);
+            let search_time = Instant::now();
+            let mut node_set: Option<Vec<usize>> = None;
+            if segments.is_empty() {
+                eprintln!("unprocessed query: {:?}", segments);
+                continue;
+            }
+            for segment in &segments {
+                if let Some(nodes) = &node_set {
+                    let mut new_node_set = Vec::with_capacity(nodes.len());
+                    for &node in nodes {
+                        let childs = &slab[node].children;
+                        for child in childs {
+                            if match segment {
+                                Segment::Substr(substr) => slab[*child].name.contains(*substr),
+                                Segment::Prefix(prefix) => slab[*child].name.starts_with(*prefix),
+                                Segment::Exact(exact) => slab[*child].name == *exact,
+                                Segment::Suffix(suffix) => slab[*child].name.ends_with(*suffix),
+                            } {
+                                new_node_set.push(*child);
                             }
                         }
                     }
-                    dbg!(search_time.elapsed());
-                }
-                // "/<exact>/"
-                ["", exact, ""] => {
-                    let search_time = Instant::now();
-                    let mut buffer = vec![0u8];
-                    buffer.extend_from_slice(exact.as_bytes());
-                    buffer.push(0);
-                    for (i, name) in name_pool.search_exact(&buffer).enumerate() {
-                        if let Some(nodes) = name_index.get(name) {
-                            for &node in nodes {
-                                println!("[{}] {}", i, slab[node].path(&slab));
-                            }
+                    node_set = Some(new_node_set);
+                } else {
+                    let names: Vec<_> = match segment {
+                        Segment::Substr(substr) => name_pool.search_substr(*substr).collect(),
+                        Segment::Prefix(prefix) => {
+                            let mut buffer = vec![0u8];
+                            buffer.extend_from_slice(prefix.as_bytes());
+                            name_pool.search_prefix(&buffer).collect()
                         }
-                    }
-                    dbg!(search_time.elapsed());
-                }
-                // "<suffix>/"
-                [suffix, ""] => {
-                    let search_time = Instant::now();
-                    let suffix = CString::new(*suffix).context("Query contains nul")?;
-                    for (i, name) in name_pool.search_suffix(&suffix).enumerate() {
-                        if let Some(nodes) = name_index.get(name) {
-                            for &node in nodes {
-                                println!("[{}] {}", i, slab[node].path(&slab));
-                            }
+                        Segment::Exact(exact) => {
+                            let mut buffer = vec![0u8];
+                            buffer.extend_from_slice(exact.as_bytes());
+                            buffer.push(0);
+                            name_pool.search_exact(&buffer).collect()
                         }
+                        Segment::Suffix(suffix) => {
+                            // Query contains nul is very rare
+                            let suffix = CString::new(*suffix).expect("Query contains nul");
+                            name_pool.search_suffix(&suffix).collect()
+                        }
+                    };
+                    let mut nodes = Vec::with_capacity(names.len());
+                    for name in names {
+                        nodes.extend_from_slice(
+                            name_index
+                                .get(name)
+                                .context("Name index or name pool corrupted")?,
+                        );
                     }
-                    dbg!(search_time.elapsed());
-                }
-                _ => {
-                    eprintln!("not implemented yet");
+                    node_set = Some(nodes);
                 }
             }
+            let search_time = search_time.elapsed();
+            for (i, node) in node_set.unwrap().into_iter().enumerate() {
+                println!("[{}] {}", i, slab[node].path(&slab));
+            }
+            dbg!(search_time);
         } else {
             // Search out all leafs that contain the substring
             // e.g. "foo": ["/System/foo", "/System/Library/aaafoo"]
@@ -299,7 +307,6 @@ fn main() -> Result<()> {
 // TODO(ldm0):
 // - file removal routine
 // - file addition routine
-// - multi-segment-query-routine
+// - segment search cache(same search routine will be triggered while user is typing, should cache exact[..], suffix, suffix/exact[..])
 // [] tui?
 // - lazy metadata design
-
