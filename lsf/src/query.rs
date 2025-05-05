@@ -16,6 +16,7 @@ pub enum Segment<'s> {
     Exact(&'s str),
 }
 
+/// Process path-query string into segments.
 pub fn query_segmentation(query: &str) -> Vec<Segment<'_>> {
     #[derive(Clone, Copy)]
     enum State {
@@ -74,6 +75,7 @@ pub fn query_segmentation(query: &str) -> Vec<Segment<'_>> {
         })
         .collect()
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

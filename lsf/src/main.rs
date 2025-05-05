@@ -1,7 +1,9 @@
+mod cache;
 mod query;
 
 use anyhow::{Context, Result};
-use bincode::{Decode, Encode, config::Configuration};
+use bincode::{Decode, Encode};
+use cache::{cache_exists, read_cache_from_file, write_cache_to_file};
 use clap::Parser;
 use fswalk::{Node, WalkData, walk_it};
 use namepool::NamePool;
@@ -11,10 +13,9 @@ use slab::Slab;
 use std::{
     collections::BTreeMap,
     ffi::CString,
-    fs::{self, File, Metadata},
-    io::{BufReader, BufWriter, Write},
-    path::{Path, PathBuf},
-    thread::available_parallelism,
+    fs::Metadata,
+    io::Write,
+    path::PathBuf,
     time::{Instant, UNIX_EPOCH},
 };
 
@@ -157,30 +158,17 @@ struct PersistentStorage {
     name_index: BTreeMap<String, Vec<usize>>,
 }
 
-const CACHE_PATH: &str = "target/cache.zstd";
-const CACHE_TMP_PATH: &str = "target/cache.zstd.tmp";
-const BINCODE_CONDFIG: Configuration = bincode::config::standard();
-
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let (slab, name_index) = if cli.refresh || !Path::new(CACHE_PATH).exists() {
+    let (slab, name_index) = if cli.refresh || !cache_exists() {
+        println!("Walking filesystem...");
         let (_slab_root, slab) = walkfs_to_slab();
         let name_index = name_index(&slab);
         (slab, name_index)
     } else {
-        let read_cache = || -> Result<_> {
-            let cache_decode_time = Instant::now();
-            let input = File::open(CACHE_PATH).context("Failed to open cache file")?;
-            let input = zstd::Decoder::new(input).context("Failed to create zstd decoder")?;
-            let mut input = BufReader::new(input);
-            let slab: PersistentStorage =
-                bincode::decode_from_std_read(&mut input, BINCODE_CONDFIG)
-                    .context("Failed to decode cache")?;
-            dbg!(cache_decode_time.elapsed());
-            Ok((slab.slab, slab.name_index))
-        };
-        read_cache().unwrap_or_else(|e| {
-            eprintln!("Failed to read cache: {:?}", e);
+        println!("Reading cache...");
+        read_cache_from_file().unwrap_or_else(|e| {
+            eprintln!("Failed to read cache: {:?}. Re-walking filesystem...", e);
             let (_slab_root, slab) = walkfs_to_slab();
             let name_index = name_index(&slab);
             (slab, name_index)
@@ -263,28 +251,7 @@ fn main() -> Result<()> {
         dbg!(search_time);
     }
 
-    {
-        let cache_encode_time = Instant::now();
-        {
-            let output = File::create(CACHE_TMP_PATH).context("Failed to create cache file")?;
-            let mut output =
-                zstd::Encoder::new(output, 6).context("Failed to create zstd encoder")?;
-            output
-                .multithread(available_parallelism().map(|x| x.get() as u32).unwrap_or(4))
-                .context("Failed to create parallel zstd encoder")?;
-            let output = output.auto_finish();
-            let mut output = BufWriter::new(output);
-            bincode::encode_into_std_write(
-                &PersistentStorage { slab, name_index },
-                &mut output,
-                BINCODE_CONDFIG,
-            )
-            .context("Failed to encode cache")?;
-        }
-        fs::rename(CACHE_TMP_PATH, CACHE_PATH).unwrap();
-        dbg!(cache_encode_time.elapsed());
-        dbg!(fs::metadata(CACHE_PATH).unwrap().len() / 1024 / 1024);
-    }
+    write_cache_to_file(slab, name_index).context("Write cache to file failed.")?;
     Ok(())
 }
 
