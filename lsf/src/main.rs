@@ -132,16 +132,22 @@ fn name_pool(name_index: &BTreeMap<String, Vec<usize>>) -> NamePool {
 }
 
 struct SearchCache {
+    slab_root: usize,
     slab: Slab<SlabNode>,
     name_index: BTreeMap<String, Vec<usize>>,
     name_pool: NamePool,
 }
 
 impl SearchCache {
-    fn new(slab: Slab<SlabNode>, name_index: BTreeMap<String, Vec<usize>>) -> Self {
+    fn new(
+        slab_root: usize,
+        slab: Slab<SlabNode>,
+        name_index: BTreeMap<String, Vec<usize>>,
+    ) -> Self {
         // name pool construction speed is fast enough that caching it doesn't worth it.
         let name_pool = name_pool(&name_index);
         Self {
+            slab_root,
             slab,
             name_index,
             name_pool,
@@ -239,6 +245,26 @@ impl SearchCache {
         }
     }
 
+    fn create_dir_all(&mut self, path: &Path) -> Result<()> {
+        // self.slab
+        todo!()
+    }
+
+    fn scan_dir(&mut self, path: &Path) -> Result<()> {
+        /*
+        let walk_data = WalkData::new();
+        let node = walk_it(path, &walk_data);
+        if let Some(node) = node {
+            self.push
+        }
+         */
+        todo!()
+    }
+
+    fn scan_file(&mut self, path: PathBuf) -> Result<()> {
+        todo!()
+    }
+
     fn remove_node(&mut self, index: usize) {
         if let Some(node) = self.slab.try_remove(index) {
             let indexes = self
@@ -257,6 +283,7 @@ impl SearchCache {
 
     fn into_persistent_storage(self) -> PersistentStorage {
         PersistentStorage {
+            slab_root: self.slab_root,
             slab: self.slab,
             name_index: self.name_index,
         }
@@ -267,18 +294,24 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let mut cache = if cli.refresh || !cache_exists() {
         println!("Walking filesystem...");
-        let (_slab_root, slab) = walkfs_to_slab();
+        let (slab_root, slab) = walkfs_to_slab();
         let name_index = name_index(&slab);
-        SearchCache::new(slab, name_index)
+        SearchCache::new(slab_root, slab, name_index)
     } else {
         println!("Reading cache...");
         read_cache_from_file()
-            .map(|PersistentStorage { slab, name_index }| SearchCache::new(slab, name_index)) // 从 PersistentStorage 中解构
+            .map(
+                |PersistentStorage {
+                     slab_root,
+                     slab,
+                     name_index,
+                 }| SearchCache::new(slab_root, slab, name_index),
+            ) // 从 PersistentStorage 中解构
             .unwrap_or_else(|e| {
                 eprintln!("Failed to read cache: {:?}. Re-walking filesystem...", e);
-                let (_slab_root, slab) = walkfs_to_slab();
+                let (slab_root, slab) = walkfs_to_slab();
                 let name_index = name_index(&slab);
-                SearchCache::new(slab, name_index)
+                SearchCache::new(slab_root, slab, name_index)
             })
     };
 

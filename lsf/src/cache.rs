@@ -13,7 +13,7 @@ use std::{
 
 #[derive(Encode, Decode)]
 pub struct PersistentStorage {
-    // slab_root: usize, slab_root 暂时不需要，因为没有从 root 遍历的需求
+    pub slab_root: usize,
     pub slab: Slab<SlabNode>,
     pub name_index: BTreeMap<String, Vec<usize>>,
 }
