@@ -393,28 +393,28 @@ impl SearchCache {
     }
 
     fn handle_fs_event(&mut self, event: FsEvent) {
-            match event.flag.scan_type() {
-                ScanType::SingleNode => {
-                    // TODO(ldm0): use scan_path_nonrecursive until we are confident about each event flag meaning.
-                    let file = self.scan_path_recursive(&event.path);
-                    if file.is_some() {
-                        println!("File changed: {:?}, {file:?}", event.path);
-                    }
+        match event.flag.scan_type() {
+            ScanType::SingleNode => {
+                // TODO(ldm0): use scan_path_nonrecursive until we are confident about each event flag meaning.
+                let file = self.scan_path_recursive(&event.path);
+                if file.is_some() {
+                    println!("File changed: {:?}, {file:?}", event.path);
                 }
-                ScanType::Folder => {
-                    let folder = self.scan_path_recursive(&event.path);
-                    if folder.is_some() {
-                        println!("Folder changed: {:?}, {folder:?}", event.path);
-                    }
-                }
-                ScanType::ReScan => {
-                    println!("!!! Rescanning");
-                    let root = self.rescan();
-                    println!("Rescan done: {root:?}");
-                }
-                ScanType::Nop => {}
             }
-            self.update_event_id(event.id);
+            ScanType::Folder => {
+                let folder = self.scan_path_recursive(&event.path);
+                if folder.is_some() {
+                    println!("Folder changed: {:?}, {folder:?}", event.path);
+                }
+            }
+            ScanType::ReScan => {
+                println!("!!! Rescanning");
+                let root = self.rescan();
+                println!("Rescan done: {root:?}");
+            }
+            ScanType::Nop => {}
+        }
+        self.update_event_id(event.id);
     }
 
     pub fn handle_fs_events(&mut self, events: Vec<FsEvent>) {
@@ -503,19 +503,15 @@ mod tests {
 
     #[test]
     fn test_search_cache_walk_and_verify() {
-        // 创建临时文件夹
         let temp_dir = TempDir::new("test_cache").expect("Failed to create temp directory");
         let temp_path = temp_dir.path();
 
-        // 在临时文件夹中创建一些文件和子文件夹
         fs::create_dir_all(temp_path.join("subdir")).expect("Failed to create subdirectory");
         fs::File::create(temp_path.join("file1.txt")).expect("Failed to create file");
         fs::File::create(temp_path.join("subdir/file2.txt")).expect("Failed to create file");
 
-        // 使用 SearchCache 遍历临时文件夹
         let cache = SearchCache::walk_fs(temp_path.to_path_buf());
 
-        // 验证 slab、name index 和 namepool 的内容
         assert_eq!(cache.slab.len(), 4);
         assert_eq!(cache.name_index.len(), 4);
         assert_eq!(
@@ -540,7 +536,6 @@ mod tests {
         let temp_dir = TempDir::new("test_events").expect("Failed to create temp directory");
         let temp_path = temp_dir.path();
 
-        // 初始化 SearchCache
         let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
 
         assert_eq!(cache.slab.len(), 1);
@@ -548,14 +543,12 @@ mod tests {
 
         fs::File::create(temp_path.join("new_file.txt")).expect("Failed to create file");
 
-        // 模拟一些文件系统事件
         let mock_events = vec![FsEvent {
             path: temp_path.join("new_file.txt"),
             id: cache.last_event_id + 1,
             flag: EventFlag::ItemCreated,
         }];
 
-        // 调用 handle_fs_events 方法
         cache.handle_fs_events(mock_events);
 
         assert_eq!(cache.slab.len(), 2);
@@ -565,27 +558,81 @@ mod tests {
 
     #[test]
     fn test_handle_fs_event_add_before_search() {
-        // 创建临时文件夹
         let temp_dir = TempDir::new("test_events").expect("Failed to create temp directory");
         let temp_path = temp_dir.path();
         fs::File::create(temp_path.join("new_file.txt")).expect("Failed to create file");
 
-        // 初始化 SearchCache
         let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
 
         assert_eq!(cache.slab.len(), 2);
         assert_eq!(cache.name_index.len(), 2);
 
-        // 模拟一些文件系统事件
         let mock_events = vec![FsEvent {
             path: temp_path.join("new_file.txt"),
             id: cache.last_event_id + 1,
             flag: EventFlag::ItemCreated,
         }];
 
-        // 调用 handle_fs_events 方法
         cache.handle_fs_events(mock_events);
 
+        assert_eq!(cache.slab.len(), 2);
+        assert_eq!(cache.name_index.len(), 2);
+        assert_eq!(cache.search("new_file.txt").unwrap().len(), 1);
+    }
+
+    // Processing outdated fs event is required to avoid bouncing.
+    #[test]
+    fn test_handle_outdated_fs_event() {
+        let temp_dir = TempDir::new("test_events").expect("Failed to create temp directory");
+        let temp_path = temp_dir.path();
+
+        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+
+        assert_eq!(cache.slab.len(), 1);
+        assert_eq!(cache.name_index.len(), 1);
+
+        fs::File::create(temp_path.join("new_file.txt")).expect("Failed to create file");
+
+        let mock_events = vec![FsEvent {
+            path: temp_path.join("new_file.txt"),
+            id: cache.last_event_id - 1,
+            flag: EventFlag::ItemCreated,
+        }];
+
+        cache.handle_fs_events(mock_events);
+
+        assert_eq!(cache.slab.len(), 2);
+        assert_eq!(cache.name_index.len(), 2);
+        assert_eq!(cache.search("new_file.txt").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_handle_fs_event_add_and_removal() {
+        let temp_dir = TempDir::new("test_events").expect("Failed to create temp directory");
+        let temp_path = temp_dir.path();
+        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+
+        assert_eq!(cache.slab.len(), 1);
+        assert_eq!(cache.name_index.len(), 1);
+
+        fs::File::create(temp_path.join("new_file.txt")).expect("Failed to create file");
+
+        let mock_events = vec![
+            FsEvent {
+                path: temp_path.join("new_file.txt"),
+                id: cache.last_event_id + 1,
+                flag: EventFlag::ItemCreated,
+            },
+            FsEvent {
+                path: temp_path.join("new_file.txt"),
+                id: cache.last_event_id + 1,
+                flag: EventFlag::ItemRemoved,
+            },
+        ];
+
+        cache.handle_fs_events(mock_events);
+
+        // Though the file in fsevents removed, we should still preserve it since it exists on disk.
         assert_eq!(cache.slab.len(), 2);
         assert_eq!(cache.name_index.len(), 2);
         assert_eq!(cache.search("new_file.txt").unwrap().len(), 1);
