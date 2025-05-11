@@ -77,7 +77,6 @@ impl SearchCache {
             (slab_root, slab)
         }
         fn name_index(slab: &Slab<SlabNode>) -> BTreeMap<String, Vec<usize>> {
-            /// Combine the construction routine of NamePool and BTreeMap since we can deduplicate node name for free.
             // TODO(ldm0): Memory optimization can be done by letting name index reference the name in the pool(gc need to be considered though)
             fn construct_name_index(
                 slab: &Slab<SlabNode>,
@@ -277,37 +276,39 @@ impl SearchCache {
     // `Self::scan_path_recursive`function returns index of the constructed node.
     // - If path is not under the watch root, None is returned.
     // - Procedure contains metadata fetching, if metadata fetching failed, None is returned.
-    pub fn scan_path_recursive(&mut self, path: &Path) -> Option<usize> {
+    pub fn scan_path_recursive(&mut self, raw_path: &Path) -> Option<usize> {
         // Ensure path is under the watch root
-        let Ok(path) = path.strip_prefix(&self.path) else {
+        let Ok(path) = raw_path.strip_prefix(&self.path) else {
             return None;
         };
-        if path.metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
+        if raw_path.metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
             self.remove_node_path(path);
             return None;
         };
         // Ensure node of the path parent is existed
         let parent = path.parent().map(|parent| self.create_node_chain(parent));
-
-        let walk_data = WalkData::new();
-        let node = walk_it(path, &walk_data);
-        if let Some(node) = node {
-            Some(construct_node_slab(parent, &node, &mut self.slab))
-        } else {
-            None
-        }
+        let walk_data = WalkData::with_ignore_directory(PathBuf::from("/System/Volumes/Data"));
+        walk_it(raw_path, &walk_data).map(|node| {
+            update_node_slab_and_name_index_and_name_pool(
+                parent,
+                &node,
+                &mut self.slab,
+                &mut self.name_index,
+                &mut self.name_pool,
+            )
+        })
     }
 
     // `Self::scan_path_nonrecursive`function returns index of the constructed node.
     // - If path is not under the watch root, None is returned.
     // - Procedure contains metadata fetching, if metadata fetching failed, None is returned.
     #[allow(dead_code)]
-    fn scan_path_nonrecursive(&mut self, path: &Path) -> Option<usize> {
+    fn scan_path_nonrecursive(&mut self, raw_path: &Path) -> Option<usize> {
         // Ensure path is under the watch root
-        let Ok(path) = path.strip_prefix(&self.path) else {
+        let Ok(path) = raw_path.strip_prefix(&self.path) else {
             return None;
         };
-        if path.metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
+        if raw_path.metadata().err().map(|e| e.kind()) == Some(ErrorKind::NotFound) {
             self.remove_node_path(path);
             return None;
         };
@@ -374,29 +375,27 @@ impl SearchCache {
         for event in events {
             if event.flag.contains(EventFlag::HistoryDone) {
                 println!("History processing done");
-            } else {
-                match event.flag.scan_type() {
-                    ScanType::SingleNode => {
-                        // TODO(ldm0): use scan_path_nonrecursive until we are confident about each event flag meaning.
-                        let file = self.scan_path_recursive(&event.path);
-                        if file.is_some() {
-                            println!("File changed: {:?}", event.path);
-                        }
+            }
+            match event.flag.scan_type() {
+                ScanType::SingleNode => {
+                    // TODO(ldm0): use scan_path_nonrecursive until we are confident about each event flag meaning.
+                    let file = self.scan_path_recursive(&event.path);
+                    if file.is_some() {
+                        println!("File changed: {:?}, {file:?}", event.path);
                     }
-                    ScanType::Folder => {
-                        println!("Folder changed: {:?}", event.path);
-                        let folder = self.scan_path_recursive(&event.path);
-                        if folder.is_some() {
-                            println!("Folder changed: {:?}", event.path);
-                        }
-                    }
-                    ScanType::ReScan => {
-                        println!("!!! Rescanning");
-                        let root = self.rescan();
-                        println!("Rescan done: {root:?}");
-                    }
-                    ScanType::Nop => {}
                 }
+                ScanType::Folder => {
+                    let folder = self.scan_path_recursive(&event.path);
+                    if folder.is_some() {
+                        println!("Folder changed: {:?}, {folder:?}", event.path);
+                    }
+                }
+                ScanType::ReScan => {
+                    println!("!!! Rescanning");
+                    let root = self.rescan();
+                    println!("Rescan done: {root:?}");
+                }
+                ScanType::Nop => {}
             }
             self.update_event_id(event.id);
         }
@@ -418,6 +417,41 @@ fn construct_node_slab(parent: Option<usize>, node: &Node, slab: &mut Slab<SlabN
     index
 }
 
+fn update_node_slab_and_name_index_and_name_pool(
+    parent: Option<usize>,
+    node: &Node,
+    slab: &mut Slab<SlabNode>,
+    name_index: &mut BTreeMap<String, Vec<usize>>,
+    name_pool: &mut NamePool,
+) -> usize {
+    let slab_node = SlabNode {
+        parent,
+        children: vec![],
+        name: node.name.clone(),
+    };
+    let index = slab.insert(slab_node);
+    if let Some(indexes) = name_index.get_mut(&node.name) {
+        indexes.push(index);
+    } else {
+        name_pool.push(&node.name);
+        name_index.insert(node.name.clone(), vec![index]);
+    }
+    slab[index].children = node
+        .children
+        .iter()
+        .map(|node| {
+            update_node_slab_and_name_index_and_name_pool(
+                Some(index),
+                node,
+                slab,
+                name_index,
+                name_pool,
+            )
+        })
+        .collect();
+    index
+}
+
 fn name_pool(name_index: &BTreeMap<String, Vec<usize>>) -> NamePool {
     let name_pool_time = Instant::now();
     let mut name_pool = NamePool::new();
@@ -430,4 +464,71 @@ fn name_pool(name_index: &BTreeMap<String, Vec<usize>>) -> NamePool {
         name_pool.len() as f32 / 1024. / 1024.
     );
     name_pool
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempdir::TempDir;
+
+    #[test]
+    fn test_search_cache_walk_and_verify() {
+        // 创建临时文件夹
+        let temp_dir = TempDir::new("test_cache").expect("Failed to create temp directory");
+        let temp_path = temp_dir.path();
+
+        // 在临时文件夹中创建一些文件和子文件夹
+        fs::create_dir_all(temp_path.join("subdir")).expect("Failed to create subdirectory");
+        fs::File::create(temp_path.join("file1.txt")).expect("Failed to create file");
+        fs::File::create(temp_path.join("subdir/file2.txt")).expect("Failed to create file");
+
+        // 使用 SearchCache 遍历临时文件夹
+        let cache = SearchCache::walk_fs(temp_path.to_path_buf());
+
+        // 验证 slab、name index 和 namepool 的内容
+        assert_eq!(cache.slab.len(), 4);
+        assert_eq!(cache.name_index.len(), 4);
+        assert_eq!(
+            cache.name_pool.len(),
+            temp_path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .as_bytes()
+                .len()
+                + b"subdir".len()
+                + b"file1.txt".len()
+                + b"file2.txt".len()
+                + 5 * b"\0".len()
+        );
+    }
+
+    #[test]
+    fn test_handle_fs_events() {
+        // 创建临时文件夹
+        let temp_dir = TempDir::new("test_events").expect("Failed to create temp directory");
+        let temp_path = temp_dir.path();
+
+        // 初始化 SearchCache
+        let mut cache = SearchCache::walk_fs(temp_dir.path().to_path_buf());
+
+        assert_eq!(cache.slab.len(), 1);
+        assert_eq!(cache.name_index.len(), 1);
+
+        fs::File::create(temp_path.join("new_file.txt")).expect("Failed to create file");
+
+        // 模拟一些文件系统事件
+        let mock_events = vec![FsEvent {
+            path: temp_path.join("new_file.txt"),
+            id: cache.last_event_id + 1,
+            flag: EventFlag::ItemCreated,
+        }];
+
+        // 调用 handle_fs_events 方法
+        cache.handle_fs_events(mock_events);
+
+        assert_eq!(cache.search("new_file.txt").unwrap().len(), 1);
+    }
 }
