@@ -15,7 +15,6 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let path = cli.path;
     let mut cache = if cli.refresh {
-        println!("Walking filesystem...");
         SearchCache::walk_fs(path)
     } else {
         println!("Try reading cache...");
