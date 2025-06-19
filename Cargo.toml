@@ -9,3 +9,6 @@ members = [
     "was",
     "lsf-tui",
 ]
+exclude = [
+    "cardinal",
+]
