@@ -1,0 +1,10 @@
+[package]
+name = "lsf-tui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+color-eyre = "0.6.4"
+crossterm = "0.29.0"
+ratatui = "0.29.0"

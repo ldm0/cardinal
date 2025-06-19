@@ -7,4 +7,5 @@ members = [
     "namepool",
     "pathbytes",
     "was",
+    "lsf-tui",
 ]
