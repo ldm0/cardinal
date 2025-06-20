@@ -22,6 +22,8 @@ fn main() -> Result<()> {
         })
     };
 
+    dbg!(&cache);
+
     let (finish_tx, finish_rx) = bounded::<Sender<SearchCache>>(1);
     let (search_tx, search_rx) = unbounded::<String>();
     let (search_result_tx, search_result_rx) = unbounded::<Result<Vec<SearchNode>>>();

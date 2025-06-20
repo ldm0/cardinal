@@ -50,6 +50,18 @@ pub struct SearchCache {
     name_pool: NamePool,
 }
 
+impl std::fmt::Debug for SearchCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SearchCache")
+            .field("path", &self.path)
+            .field("last_event_id", &self.last_event_id)
+            .field("slab_root", &self.slab_root)
+            .field("slab.len()", &self.slab.len())
+            .field("name_index.len()", &self.name_index.len())
+            .finish()
+    }
+}
+
 #[derive(Debug)]
 pub struct SearchNode {
     pub path: PathBuf,
