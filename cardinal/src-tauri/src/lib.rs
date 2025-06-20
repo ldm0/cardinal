@@ -125,7 +125,7 @@ pub fn run() -> Result<()> {
                     // TODO(ldm0): is this necessary?
                     api.prevent_exit();
 
-                    // TODO(ldm0): change the tray icon
+                    // TODO(ldm0): change the tray icon to "saving"
 
                     let (cache_tx, cache_rx) = bounded::<SearchCache>(1);
                     finish_tx
