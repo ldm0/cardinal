@@ -4,7 +4,7 @@ use cardinal_sdk::{EventStream, FSEventStreamEventId, FsEvent};
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use search_cache::{SearchCache, SearchNode};
 use std::path::PathBuf;
-use tauri::{Emitter, Manager, RunEvent, State};
+use tauri::{Emitter, RunEvent, State};
 
 struct SearchState {
     search_tx: Sender<String>,
@@ -113,36 +113,35 @@ pub fn run() -> Result<()> {
         println!("Background thread exited");
     });
 
-    app.run(move |_app_handle, _event| {
-        match &_event {
-            RunEvent::WindowEvent {
-                event: tauri::WindowEvent::CloseRequested { api, .. },
-                label,
-                ..
-            } => {
-                println!("closing window, label: {}", label);
-                // run the window destroy manually just for fun :)
-                // usually you'd show a dialog here to ask for confirmation or whatever
-                api.prevent_close();
+    app.run(move |app_handle, event| {
+        match &event {
+            RunEvent::ExitRequested { api, code, .. } => {
+                // Keep the event loop running even if all windows are closed
+                // This allow us to catch tray icon events when there is no window
+                // if we manually requested an exit (code is Some(_)) we will let it go through
+                if code.is_none() {
+                    println!("Tauri application exited, flushing cache...");
 
-                println!("Tauri application exited, flushing cache...");
-                let (cache_tx, cache_rx) = bounded::<SearchCache>(1);
-                finish_tx
-                    .send(cache_tx)
-                    .context("cache_tx is closed")
-                    .unwrap();
-                let cache = cache_rx.recv().context("cache_tx is closed").unwrap();
-                cache
-                    .flush_to_file()
-                    .context("Failed to write cache to file")
-                    .unwrap();
-                println!("Cache flushed successfully");
+                    // TODO(ldm0): is this necessary?
+                    api.prevent_exit();
 
-                _app_handle
-                    .get_webview_window(label)
-                    .unwrap()
-                    .destroy()
-                    .unwrap();
+                    // TODO(ldm0): change the tray icon
+
+                    let (cache_tx, cache_rx) = bounded::<SearchCache>(1);
+                    finish_tx
+                        .send(cache_tx)
+                        .context("cache_tx is closed")
+                        .unwrap();
+                    let cache = cache_rx.recv().context("cache_tx is closed").unwrap();
+                    cache
+                        .flush_to_file()
+                        .context("Failed to write cache to file")
+                        .unwrap();
+
+                    println!("Cache flushed successfully");
+
+                    app_handle.exit(66);
+                }
             }
             _ => (),
         }
