@@ -8,8 +8,12 @@
     - 理想的是一个插入O(logn)，查找O(logn)，用数字索引O(logn)的有序的数据结构
         - indexmap插入是 O(n) 的
         - skiplist?
+            - crossbeam-skiplist? 不过不支持 mutable access
 - 需要在内容没有返回时阻塞滚动条
     - 标准的 scroll bar 没有实现这个，只能用假 scroll bar 了 https://github.com/yairEO/fakescroll/blob/master/react.fakescroll.js
 - web 传 view-top view-bottom 的两个浮点数进来
 - cardinal：增加状态栏：扫描了多少个文件，处理了多少个 fsevent
 - 只传 slab index 进来，然后渲染是 lazy 的比较合适
+- 增加 fsevent path merger: 
+    - /app/good + /app/good/Cargo.toml == /app/good
+    - /app/good/aaa.txt + /app/good/aaa.txt == /app/good/aaa.txt
