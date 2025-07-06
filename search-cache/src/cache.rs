@@ -2,7 +2,8 @@ use crate::persistent::{read_cache_from_file, write_cache_to_file, PersistentSto
 use anyhow::{anyhow, bail, Context, Result};
 use bincode::{Decode, Encode};
 use cardinal_sdk::{current_event_id, EventFlag, FsEvent, ScanType};
-use fswalk::{walk_it, Node, NodeMetadata, WalkData};
+pub use fswalk::WalkData;
+use fswalk::{walk_it, Node, NodeMetadata};
 use namepool::NamePool;
 use query_segmentation::{query_segmentation, Segment};
 use serde::{Deserialize, Serialize};
@@ -98,9 +99,15 @@ impl SearchCache {
     }
 
     pub fn walk_fs(path: PathBuf) -> Self {
-        fn walkfs_to_slab(path: &Path) -> (usize, Slab<SlabNode>) {
+        Self::walk_fs_with_walk_data(
+            path,
+            &WalkData::new(PathBuf::from("/System/Volumes/Data"), false),
+        )
+    }
+
+    pub fn walk_fs_with_walk_data(path: PathBuf, walk_data: &WalkData) -> Self {
+        fn walkfs_to_slab(path: &Path, walk_data: &WalkData) -> (usize, Slab<SlabNode>) {
             // 先多线程构建树形文件名列表(不能直接创建 slab 因为 slab 无法多线程构建(slab 节点有相互引用，不想加锁))
-            let walk_data = WalkData::new(PathBuf::from("/System/Volumes/Data"), false);
             let visit_time = Instant::now();
             let node = walk_it(path, &walk_data).expect("failed to walk");
             info!(
@@ -150,7 +157,7 @@ impl SearchCache {
         }
 
         let last_event_id = current_event_id();
-        let (slab_root, slab) = walkfs_to_slab(&path);
+        let (slab_root, slab) = walkfs_to_slab(&path, walk_data);
         let name_index = name_index(&slab);
         Self::new(path, last_event_id, slab_root, slab, name_index)
     }

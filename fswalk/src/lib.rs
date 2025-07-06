@@ -58,11 +58,12 @@ pub struct WalkData {
 }
 
 impl WalkData {
-    pub fn new(path: PathBuf, need_metadata: bool) -> Self {
+    pub const fn new(path: PathBuf, need_metadata: bool) -> Self {
         Self {
+            num_files: AtomicUsize::new(0),
+            num_dirs: AtomicUsize::new(0),
             ignore_directory: Some(path),
             need_metadata,
-            ..Default::default()
         }
     }
 }
