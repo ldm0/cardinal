@@ -50,16 +50,18 @@ function formatKB(bytes) {
 
 function App() {
   const [results, setResults] = useState([]);
-  // Column widths in px
   const [colWidths, setColWidths] = useState({ path: 600, modified: 180, created: 180, size: 120 });
-  const resizingRef = useRef(null); // { key: 'path'|'modified'|'created'|'size', startX, startW }
+  const resizingRef = useRef(null);
   const lruCache = useRef(new LRUCache(1000));
   const infiniteLoaderRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isStatusBarVisible, setIsStatusBarVisible] = useState(true);
   const [statusText, setStatusText] = useState("Walking filesystem...");
-  // Single horizontal scroll container now wraps header + list, so no sync refs needed
+  // 新增refs用于同步竖直滚动条
+  const scrollAreaRef = useRef(null);
+  const listRef = useRef(null);
+  const [verticalBar, setVerticalBar] = useState({ top: 0, height: 0, visible: false });
 
   useEffect(() => {
     listen('status_update', (event) => {
@@ -80,22 +82,71 @@ function App() {
   }, [isInitialized]);
 
   useEffect(() => {
-    // console.log("results", results);
     if (infiniteLoaderRef.current) {
-      // console.log("resetting load more rows cache");
       infiniteLoaderRef.current.resetLoadMoreRowsCache(true);
     }
   }, [results]);
 
-  // With unified scroll container, no manual scroll syncing required
+  // 竖直滚动条同步逻辑
+  useEffect(() => {
+    function updateVerticalBar() {
+      if (!listRef.current || !scrollAreaRef.current) return;
+      const grid = listRef.current.Grid || listRef.current;
+      const totalRows = results.length;
+      const rowHeight = 24;
+      const visibleHeight = grid.props.height;
+      const totalHeight = totalRows * rowHeight;
+      const scrollTop = grid.state ? grid.state.scrollTop : 0;
+      if (totalHeight <= visibleHeight) {
+        setVerticalBar({ top: 0, height: 0, visible: false });
+        return;
+      }
+      const barHeight = Math.max(32, visibleHeight * visibleHeight / totalHeight);
+      const barTop = (scrollTop / totalHeight) * visibleHeight;
+      setVerticalBar({ top: barTop, height: barHeight, visible: true });
+    }
+    updateVerticalBar();
+    if (!listRef.current) return;
+    const grid = listRef.current.Grid || listRef.current;
+    const onScroll = () => updateVerticalBar();
+    grid && grid._scrollingContainer && grid._scrollingContainer.addEventListener('scroll', onScroll);
+    return () => {
+      grid && grid._scrollingContainer && grid._scrollingContainer.removeEventListener('scroll', onScroll);
+    };
+  }, [results]);
+
+  // 拖动竖直滚动条
+  const onVerticalBarMouseDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startY = e.clientY;
+    const startTop = verticalBar.top;
+    const grid = listRef.current?.Grid || listRef.current;
+    const visibleHeight = grid?.props.height || 1;
+    const totalRows = results.length;
+    const rowHeight = 24;
+    const totalHeight = totalRows * rowHeight;
+    function onMove(ev) {
+      const deltaY = ev.clientY - startY;
+      let newTop = Math.max(0, Math.min(visibleHeight - verticalBar.height, startTop + deltaY));
+      const scrollTop = (newTop / visibleHeight) * totalHeight;
+      if (grid && grid._scrollingContainer) {
+        grid._scrollingContainer.scrollTop = scrollTop;
+      }
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp, { once: true });
+  };
 
   const handleSearch = async (query) => {
-    // console.log("handleSearch", query);
     let searchResults = [];
     if (query.trim() !== '') {
       searchResults = await invoke("search", { query });
     }
-    // console.log("got query results, clearing lru cache", query, searchResults);
     lruCache.current.clear();
     setResults(searchResults);
   };
@@ -108,7 +159,6 @@ function App() {
     }, 300);
   };
 
-  // Column resizing handlers
   const onResizeStart = (key) => (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -134,15 +184,12 @@ function App() {
 
   const isRowLoaded = ({ index }) => {
     let loaded = lruCache.current.has(index);
-    // console.log("isRowLoaded loading", index, loaded)
     return loaded;
   };
 
   const loadMoreRows = async ({ startIndex, stopIndex }) => {
     let rows = results.slice(startIndex, stopIndex + 1);
-    // console.log("start loading more rows", startIndex, stopIndex, rows);
     const searchResults = await invoke("get_nodes_info", { results: rows });
-    // console.log("loading more rows", startIndex, stopIndex, searchResults);
     for (let i = startIndex; i <= stopIndex; i++) {
       lruCache.current.put(i, searchResults[i - startIndex]);
     }
@@ -150,9 +197,7 @@ function App() {
 
   const rowRenderer = ({ key, index, style }) => {
     const item = lruCache.current.get(index);
-    // console.log("rendering row", index, item);
     const path = typeof item === 'string' ? item : item?.path;
-    // Prefer nested metadata.mtime, but also support top-level mtime if backend changed shape
     const mtimeSec =
       typeof item !== 'string'
         ? (item?.metadata?.mtime ?? item?.mtime)
@@ -218,7 +263,6 @@ function App() {
           autoCapitalize="off"
         />
       </div>
-      {/* Results with unified horizontal scroll (header + list share the same container) */}
       <div
         className="results-container"
         style={{
@@ -228,16 +272,10 @@ function App() {
           ['--w-size']: `${colWidths.size}px`,
         }}
       >
-        {/* The scroll-area provides a single horizontal scrollbar for both header and list */}
+        {/* 横向滚动区域 */}
         <div
           className="scroll-area"
-          style={{
-            overflowX: 'auto',
-            overflowY: 'hidden',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
+          ref={scrollAreaRef}
         >
           <div className="header-row columns">
             <span className="path-text header header-cell">
@@ -257,37 +295,54 @@ function App() {
               <span className="col-resizer" onMouseDown={onResizeStart('size')} />
             </span>
           </div>
-          {/* List fills remaining vertical space */}
           <div style={{ flex: 1, minHeight: 0 }}>
-          <InfiniteLoader
-            ref={infiniteLoaderRef}
-            isRowLoaded={isRowLoaded}
-            loadMoreRows={loadMoreRows}
-            rowCount={results.length}
-          >
-            {({ onRowsRendered, registerChild }) => (
-              <AutoSizer>
-                {({ height, width }) => {
-                  const colGap = 12; // keep in sync with CSS --col-gap
-                  const columnsTotal =
-                    colWidths.path + colWidths.modified + colWidths.created + colWidths.size + (3 * colGap) + 20; // + paddings
-                  return (
-                  <List
-                    ref={registerChild}
-                    onRowsRendered={onRowsRendered}
-                    width={Math.max(width, columnsTotal)}
-                    height={height}
-                    rowCount={results.length}
-                    rowHeight={24}
-                    rowRenderer={rowRenderer}
-                  />
-                  );
-                }}
-              </AutoSizer>
-            )}
-          </InfiniteLoader>
+            <InfiniteLoader
+              ref={infiniteLoaderRef}
+              isRowLoaded={isRowLoaded}
+              loadMoreRows={loadMoreRows}
+              rowCount={results.length}
+            >
+              {({ onRowsRendered, registerChild }) => (
+                <AutoSizer>
+                  {({ height, width }) => {
+                    const colGap = 12;
+                    const columnsTotal =
+                      colWidths.path + colWidths.modified + colWidths.created + colWidths.size + (3 * colGap) + 20;
+                    return (
+                      <List
+                        ref={el => {
+                          registerChild(el);
+                          listRef.current = el;
+                        }}
+                        onRowsRendered={onRowsRendered}
+                        width={Math.max(width, columnsTotal)}
+                        height={height}
+                        rowCount={results.length}
+                        rowHeight={24}
+                        rowRenderer={rowRenderer}
+                      />
+                    );
+                  }}
+                </AutoSizer>
+              )}
+            </InfiniteLoader>
           </div>
         </div>
+        {/* 悬浮竖直滚动条 */}
+        {verticalBar.visible && (
+          <div className="vertical-scrollbar">
+            <div
+              className="vertical-scrollbar-inner"
+              style={{
+                height: verticalBar.height,
+                top: verticalBar.top,
+                position: 'absolute',
+                right: 0,
+              }}
+              onMouseDown={onVerticalBarMouseDown}
+            />
+          </div>
+        )}
       </div>
       {isStatusBarVisible && (
         <div className={`status-bar ${isInitialized ? 'fade-out' : ''}`}>

@@ -117,14 +117,51 @@ button:active {
   flex: 1;
   width: 100%;
   height: 100%;
-  overflow-y: auto;
-  /* vertical scroll for results */
-  overflow-x: auto;
-  /* horizontal scroll synced with title bar */
-  /* Column layout tokens */
+  position: relative;
+  /* 允许内部绝对定位竖直滚动条 */
   --col-gap: 12px;
-  /* 3 gaps + 10px left + 10px right padding = 20px */
   --columns-total: calc(var(--w-path, 600px) + var(--w-modified, 180px) + var(--w-created, 180px) + var(--w-size, 120px) + (3 * var(--col-gap)) + 20px);
+}
+
+/* 横向滚动区域，隐藏竖直滚动条 */
+.scroll-area {
+  overflow-x: auto;
+  overflow-y: hidden !important;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* 让横向滚动条属于scroll-area */
+}
+
+/* 悬浮竖直滚动条 */
+.vertical-scrollbar {
+  position: absolute;
+  top: 37px; /* header高度，需与JS同步 32px + 2px * 2 */
+  right: 0;
+  width: 7px;
+  height: calc(100% - 37px);
+  background: transparent;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  pointer-events: none; /* 让滚动条本身不拦截事件，实际滚动靠JS同步 */
+}
+
+.vertical-scrollbar-inner {
+  width: 100%;
+  border-radius: 6px;
+  /* 255 * x + 32 * (1 - x) = 150   =>   x = 0.41114 */
+  background: rgba(255,255,255,0.41114);
+  box-shadow: 0 0 2px 0 rgba(0,0,0,0.10);
+  transition: background 0.5s;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* 鼠标悬停时略微加深 */
+.vertical-scrollbar-inner:hover {
+  /* 255 * x + 32 * (1 - x) = 157   =>   x = 0.43554 */
+  background: rgba(255,255,255,0.43554);
 }
 
 /* === Columns (Grid) === */
@@ -206,7 +243,11 @@ button:active {
 /* Let wrapper control horizontal scroll; List keeps vertical scroll only */
 .ReactVirtualized__Grid {
   overflow-x: visible !important;
-  overflow-y: auto !important;
+  overflow-y: scroll !important;
+  scrollbar-width: none !important; /* Firefox */
+}
+.ReactVirtualized__Grid::-webkit-scrollbar {
+  display: none !important;
 }
 
 /* Rows (rendered inside virtual list) */
