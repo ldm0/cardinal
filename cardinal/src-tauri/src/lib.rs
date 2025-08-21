@@ -6,7 +6,7 @@ use search_cache::{HandleFSEError, SearchCache, SearchNode, SlabNodeMetadata, Wa
 use serde::Serialize;
 use std::{
     cell::LazyCell,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, LazyLock, Once,
@@ -85,6 +85,21 @@ async fn get_nodes_info(
     Ok(node_info_results)
 }
 
+#[tauri::command]
+fn open_in_finder(path: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let p = Path::new(&path);
+        // On macOS, `open -R` reveals the file or directory in Finder.
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(p)
+            .spawn()
+            .map_err(|e| format!("Failed to reveal path in Finder: {}", e))?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> Result<()> {
     // Initialize the tracing subscriber to print logs to the command line
@@ -111,7 +126,11 @@ pub fn run() -> Result<()> {
             node_info_tx,
             node_info_results_rx,
         })
-        .invoke_handler(tauri::generate_handler![search, get_nodes_info])
+        .invoke_handler(tauri::generate_handler![
+            search,
+            get_nodes_info,
+            open_in_finder
+        ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
@@ -214,7 +233,7 @@ pub fn run() -> Result<()> {
         match &event {
             RunEvent::Exit => {
                 // 右键关闭的时候会被调用
-                // TODO(ldm0): 未来这里可以优化成时不时保存一下，然后关闭的时候如果10秒内之前存过就不再存了
+                // TODO(ldm0): 未来这里可以优化成不时保存一下，然后关闭的时候如果10秒内之前存过就不再存了
 
                 // Write cache to file before app exit
                 flush_cache_to_file_once(&finish_tx);
