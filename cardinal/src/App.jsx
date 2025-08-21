@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { once, listen } from '@tauri-apps/api/event';
-import { InfiniteLoader, List, AutoSizer } from 'react-virtualized';
+import { InfiniteLoader, Grid, AutoSizer } from 'react-virtualized';
 import 'react-virtualized/styles.css';
 import "./App.css";
 import { LRUCache } from "./utils/LRUCache";
-import { VirtualizedRow } from "./components/VirtualizedRow";
+import { formatKB } from "./utils/format";
+import { MiddleEllipsis } from "./components/MiddleEllipsis";
+import { ContextMenu } from "./components/ContextMenu";
 import { ColumnHeader } from "./components/ColumnHeader";
 
 // 默认列宽
@@ -27,6 +29,7 @@ function App() {
   const [statusText, setStatusText] = useState("Walking filesystem...");
   const scrollAreaRef = useRef(null);
   const listRef = useRef(null);
+  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, path: null });
 
   // 状态事件
   useEffect(() => {
@@ -96,7 +99,7 @@ function App() {
   };
 
   // 虚拟列表加载
-  const isRowLoaded = ({ index }) => lruCache.current.has(index);
+  const isCellLoaded = ({ rowIndex }) => lruCache.current.has(rowIndex);
   const loadMoreRows = async ({ startIndex, stopIndex }) => {
     let rows = results.slice(startIndex, stopIndex + 1);
     const searchResults = await invoke("get_nodes_info", { results: rows });
@@ -105,10 +108,73 @@ function App() {
     }
   };
 
-  // 行渲染
-  const rowRenderer = ({ key, index, style }) => (
-    <VirtualizedRow key={key} index={index} style={style} item={lruCache.current.get(index)} />
-  );
+  // 单元格渲染
+  const cellRenderer = ({ columnIndex, key, rowIndex, style }) => {
+    // Grid只渲染一列，但我们把整行内容放在第一列
+    if (columnIndex !== 0) return null;
+    
+    const item = lruCache.current.get(rowIndex);
+    const path = typeof item === 'string' ? item : item?.path;
+    const filename = path ? path.split(/[\\/]/).pop() : '';
+    const mtimeSec = typeof item !== 'string' ? (item?.metadata?.mtime ?? item?.mtime) : undefined;
+    const mtimeText = mtimeSec != null ? new Date(mtimeSec * 1000).toLocaleString() : null;
+    const ctimeSec = typeof item !== 'string' ? (item?.metadata?.ctime ?? item?.ctime) : undefined;
+    const ctimeText = ctimeSec != null ? new Date(ctimeSec * 1000).toLocaleString() : null;
+    const sizeBytes = typeof item !== 'string' ? (item?.metadata?.size ?? item?.size) : undefined;
+    const sizeText = formatKB(sizeBytes);
+
+    const handleContextMenu = (e) => {
+      e.preventDefault();
+      if (path) {
+        setContextMenu({ visible: true, x: e.clientX, y: e.clientY, path });
+      }
+    };
+
+    return (
+      <div
+        key={key}
+        style={style}
+        className={`row ${rowIndex % 2 === 0 ? 'row-even' : 'row-odd'}`}
+        onContextMenu={handleContextMenu}
+      >
+        {item ? (
+          <div className="columns row-inner" title={path}>
+            <MiddleEllipsis className="filename-text" text={filename} />
+            <MiddleEllipsis className="path-text" text={path} />
+            {mtimeText ? (
+              <span className="mtime-text">{mtimeText}</span>
+            ) : (
+              <span className="mtime-text muted">—</span>
+            )}
+            {ctimeText ? (
+              <span className="ctime-text">{ctimeText}</span>
+            ) : (
+              <span className="ctime-text muted">—</span>
+            )}
+            {sizeText ? (
+              <span className="size-text">{sizeText}</span>
+            ) : (
+              <span className="size-text muted">—</span>
+            )}
+          </div>
+        ) : (
+          <div />
+        )}
+      </div>
+    );
+  };
+
+  // 上下文菜单处理
+  const closeContextMenu = () => {
+    setContextMenu({ ...contextMenu, visible: false });
+  };
+
+  const menuItems = [
+    {
+      label: 'Open in Finder',
+      action: () => invoke('open_in_finder', { path: contextMenu.path }),
+    },
+  ];
 
   return (
     <main className="container">
@@ -138,7 +204,7 @@ function App() {
           <div style={{ flex: 1, minHeight: 0 }}>
             <InfiniteLoader
               ref={infiniteLoaderRef}
-              isRowLoaded={isRowLoaded}
+              isRowLoaded={isCellLoaded}
               loadMoreRows={loadMoreRows}
               rowCount={results.length}
             >
@@ -148,17 +214,21 @@ function App() {
                     const columnsTotal =
                       colWidths.filename + colWidths.path + colWidths.modified + colWidths.created + colWidths.size + (4 * COL_GAP) + COLUMNS_EXTRA;
                     return (
-                      <List
+                      <Grid
                         ref={el => {
                           registerChild(el);
                           listRef.current = el;
                         }}
-                        onRowsRendered={onRowsRendered}
+                        onSectionRendered={({ rowStartIndex, rowStopIndex }) => 
+                          onRowsRendered({ startIndex: rowStartIndex, stopIndex: rowStopIndex })
+                        }
                         width={Math.max(width, columnsTotal)}
                         height={height}
                         rowCount={results.length}
+                        columnCount={1}
                         rowHeight={ROW_HEIGHT}
-                        rowRenderer={rowRenderer}
+                        columnWidth={Math.max(width, columnsTotal)}
+                        cellRenderer={cellRenderer}
                       />
                     );
                   }}
@@ -177,6 +247,14 @@ function App() {
             </div>
           )}
         </div>
+      )}
+      {contextMenu.visible && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={menuItems}
+          onClose={closeContextMenu}
+        />
       )}
     </main>
   );
