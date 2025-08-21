@@ -12,6 +12,10 @@ export const ColumnHeader = forwardRef(({ colWidths, onResizeStart }, ref) => {
           Path
           <span className="col-resizer" onMouseDown={onResizeStart('path')} />
         </span>
+        <span className="size-text header header-cell">
+          Size
+          <span className="col-resizer" onMouseDown={onResizeStart('size')} />
+        </span>
         <span className="mtime-text header header-cell">
           Modified
           <span className="col-resizer" onMouseDown={onResizeStart('modified')} />
@@ -19,10 +23,6 @@ export const ColumnHeader = forwardRef(({ colWidths, onResizeStart }, ref) => {
         <span className="ctime-text header header-cell">
           Created
           <span className="col-resizer" onMouseDown={onResizeStart('created')} />
-        </span>
-        <span className="size-text header header-cell">
-          Size
-          <span className="col-resizer" onMouseDown={onResizeStart('size')} />
         </span>
       </div>
     </div>

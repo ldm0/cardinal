@@ -35,14 +35,14 @@ export function FileRow({ item, rowIndex, style, onContextMenu }) {
       <div className="columns row-inner" title={path}>
         <MiddleEllipsis className="filename-text" text={filename} />
         <MiddleEllipsis className="path-text" text={path} />
+        <span className={`size-text ${!sizeText ? 'muted' : ''}`}>
+          {sizeText || '—'}
+        </span>
         <span className={`mtime-text ${!mtimeText ? 'muted' : ''}`}>
           {mtimeText || '—'}
         </span>
         <span className={`ctime-text ${!ctimeText ? 'muted' : ''}`}>
           {ctimeText || '—'}
-        </span>
-        <span className={`size-text ${!sizeText ? 'muted' : ''}`}>
-          {sizeText || '—'}
         </span>
       </div>
     </div>

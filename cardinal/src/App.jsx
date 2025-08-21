@@ -64,9 +64,9 @@ function App() {
         style={{
           ['--w-filename']: `${colWidths.filename}px`,
           ['--w-path']: `${colWidths.path}px`,
+          ['--w-size']: `${colWidths.size}px`,
           ['--w-modified']: `${colWidths.modified}px`,
           ['--w-created']: `${colWidths.created}px`,
-          ['--w-size']: `${colWidths.size}px`,
         }}
       >
         <div className="scroll-area" ref={scrollAreaRef}>
