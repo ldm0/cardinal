@@ -22,7 +22,7 @@ export function ContextMenu({ x, y, items, onClose }) {
   };
 
   return createPortal(
-    <div ref={menuRef} className="context-menu" style={{ top: y, left: x }}>
+    <div ref={menuRef} className='context-menu' style={{ top: y, left: x }}>
       <ul>
         {items.map((item, index) => (
           <li key={index} onClick={() => handleItemClick(item.action)}>

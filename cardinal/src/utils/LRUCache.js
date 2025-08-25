@@ -1,6 +1,4 @@
-/**
- * LRU (Least Recently Used) Cache implementation for caching virtualized row data
- */
+// LRU (Least Recently Used) Cache implementation for caching virtualized row data
 export class LRUCache {
   constructor(capacity) {
     this.capacity = capacity;

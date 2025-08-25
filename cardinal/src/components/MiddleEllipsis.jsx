@@ -48,9 +48,5 @@ export function MiddleEllipsis({ text, className }) {
     return () => resizeObserver.disconnect();
   }, [text]);
 
-  return (
-    <span ref={containerRef} className={className} title={text}>
-      {display}
-    </span>
-  );
+  return <span ref={containerRef} className={className} title={text}>{display}</span>;
 }

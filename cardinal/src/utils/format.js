@@ -1,6 +1,4 @@
-/**
- * Format bytes into human-readable sizes
- */
+// Format bytes into human-readable sizes
 export function formatBytes(bytes) {
   if (bytes == null || !isFinite(bytes)) return null;
   
@@ -17,9 +15,7 @@ export function formatBytes(bytes) {
   return `${size.toFixed(decimals)} ${units[unitIndex]}`;
 }
 
-/**
- * Format bytes into KB with one decimal place (legacy function)
- */
+// Format bytes into KB with one decimal place (legacy function)
 export function formatKB(bytes) {
   if (bytes == null || !isFinite(bytes)) return null;
   const kb = bytes / 1024;

@@ -2,11 +2,11 @@
 
 // 列宽比例 - 基于窗口宽度的百分比分配
 export const COL_WIDTH_RATIOS = {
-  filename: 0.18,  // 18%
-  path: 0.45,      // 45% - 最重要的列
-  size: 0.08,      // 8%
+  filename: 0.18, // 18%
+  path: 0.45, // 45% - 最重要的列
+  size: 0.08, // 8%
   modified: 0.145, // 14.5%
-  created: 0.145   // 14.5%
+  created: 0.145 // 14.5%
 };
 
 // 根据窗口宽度计算初始列宽
@@ -39,7 +39,5 @@ export const MIN_COL_WIDTH = 30;
 export const MAX_COL_WIDTH = 10000;
 
 // Grid calculations
-export const calculateColumnsTotal = (colWidths) => 
-  Object.values(colWidths).reduce((sum, width) => sum + width, 0) + 
-  (Object.keys(colWidths).length - 1) * COL_GAP + 
-  COLUMNS_EXTRA;
+export const calculateColumnsTotal = (colWidths) =>
+  Object.values(colWidths).reduce((sum, width) => sum + width, 0) + (Object.keys(colWidths).length - 1) * COL_GAP + COLUMNS_EXTRA;
