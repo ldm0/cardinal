@@ -1,5 +1,4 @@
 import React from 'react';
-import './StateDisplay.css';
 
 const State = ({ icon, title, message }) => (
   <div className="state-display">

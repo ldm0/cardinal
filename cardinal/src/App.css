@@ -422,15 +422,6 @@ button:active {
   font-weight: 500;
 }
 
-.search-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid rgba(var(--color-accent-rgb), 0.2);
-  border-top: 3px solid var(--color-accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
@@ -552,6 +543,56 @@ button:active {
   line-height: 24px;
 }
 .context-menu li:hover { background-color: var(--color-accent); color: #fff; }
+
+.state-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
+  text-align: center;
+  padding: 20px;
+}
+
+.state-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: var(--color-muted);
+  max-width: 400px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(var(--color-accent-rgb), 0.2);
+  border-top: 3px solid var(--color-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.state-icon {
+  color: var(--color-accent);
+  margin-bottom: 8px;
+}
+
+.error-icon {
+  font-size: 48px;
+  font-weight: bold;
+  color: var(--color-error, #dc3545);
+}
+
+.state-title {
+  font-size: 1.125rem; /* 18px */
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.state-message {
+  font-size: 0.875rem; /* 14px */
+  color: var(--color-muted);
+}
 
 /* === Utilities (extracted from inline JSX styles) === */
 .flex-fill { flex: 1; min-height: 0; }
