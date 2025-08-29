@@ -41,6 +41,7 @@
   --col-max-width: 10000px;          /* 列宽最大值 */
   --container-padding: 10px;
   --virtual-scrollbar-width: 18px;   /* 虚拟滚动条宽度 */
+  --virtual-scrollbar-thumb-min: 24px; /* JS/CSS 统一的 thumb 最小高度（可覆盖） */
   /* Horizontal padding for header & data cells */
   --cell-hpad: 0.4rem;
 }
@@ -89,7 +90,6 @@ main,
   grid-template-columns: 100%;
   text-align: center;
   height: 100vh;
-  gap: 0.25rem;
 }
 
 /* === Search Bar === */

@@ -1,4 +1,5 @@
 import React, { useRef, useState, useCallback, useLayoutEffect, useEffect, forwardRef, useImperativeHandle, useMemo } from 'react';
+import { SCROLLBAR_THUMB_MIN } from '../constants';
 
 /**
  * 虚拟滚动列表组件
@@ -94,7 +95,7 @@ export const VirtualList = forwardRef(function VirtualList({
 		}
 		
 		thumb.style.display = 'block';
-		const thumbHeight = Math.max(20, (viewportHeight / totalHeight) * trackHeight);
+		const thumbHeight = Math.max(SCROLLBAR_THUMB_MIN, (viewportHeight / totalHeight) * trackHeight);
 		const scrollRatio = scrollTop / maxScrollTop;
 		const thumbTop = scrollRatio * (trackHeight - thumbHeight);
 		

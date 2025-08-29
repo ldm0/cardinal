@@ -31,6 +31,10 @@ export const CONTAINER_PADDING = 10;
 // 与 CSS 变量 --virtual-scrollbar-width 保持同步
 export const SCROLLBAR_WIDTH = 14;
 
+// Minimum thumb height for the virtual scrollbar (in px). Keep this in sync with
+// the CSS variable --virtual-scrollbar-thumb-min in src/App.css.
+export const SCROLLBAR_THUMB_MIN = 24;
+
 // Cache and Performance
 export const CACHE_SIZE = 1000;
 export const SEARCH_DEBOUNCE_MS = 300;
