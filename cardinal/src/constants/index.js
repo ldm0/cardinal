@@ -2,8 +2,8 @@
 
 // 列宽比例 - 基于窗口宽度的百分比分配
 export const COL_WIDTH_RATIOS = {
-  filename: 0.18, // 18%
-  path: 0.45, // 45% - 最重要的列
+  filename: 0.25, // 25%
+  path: 0.38, // 38%
   size: 0.08, // 8%
   modified: 0.145, // 14.5%
   created: 0.145 // 14.5%
