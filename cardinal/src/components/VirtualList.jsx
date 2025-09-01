@@ -6,9 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
  * 虚拟滚动列表组件（含行数据按需加载缓存）
  */
 export const VirtualList = forwardRef(function VirtualList({
-	// 若传入 results，则 rowCount 可省略
 	results = null,
-	rowCount: explicitRowCount = 0,
 	rowHeight = 24,
 	overscan = 5,
 	renderRow,
@@ -35,8 +33,8 @@ export const VirtualList = forwardRef(function VirtualList({
 	const [viewportHeight, setViewportHeight] = useState(0);
 	const [range, setRange] = useState({ start: 0, end: -1 });
 
-	// 统一行数（优先使用 results.length）
-	const rowCount = results ? results.length : explicitRowCount;
+	// 行数直接来自 results（不再支持显式 rowCount）
+	const rowCount = results?.length ?? 0;
 
 	// 计算总虚拟高度和滚动范围
 	const { totalHeight, maxScrollTop } = useMemo(() => ({
