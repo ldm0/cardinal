@@ -10,7 +10,6 @@ export const VirtualList = forwardRef(function VirtualList({
 	rowHeight = 24,
 	overscan = 5,
 	renderRow,
-	onRangeChange,
 	onScrollSync,
 	className = ''
 }, ref) {
@@ -55,16 +54,10 @@ export const VirtualList = forwardRef(function VirtualList({
 
 	// 统一的 range 更新封装
 	const setRangeIfChanged = useCallback((nextRange) => {
-		setRange(prev => {
-			const changed = prev.start !== nextRange.start || prev.end !== nextRange.end;
-			if (changed && onRangeChange && nextRange.end >= nextRange.start && rowCount > 0) {
-				onRangeChange(nextRange.start, nextRange.end);
-			}
-			return changed ? nextRange : prev;
-		});
-	}, [onRangeChange, rowCount]);
+		setRange(prev => (prev.start !== nextRange.start || prev.end !== nextRange.end) ? nextRange : prev);
+	}, []);
 
-	// 内置行数据加载（原 useRowData.ensureRangeLoaded）
+	// 内置行数据加载
 	const ensureRangeLoaded = useCallback(async (start, end) => {
 		if (!results || start < 0 || end < start || rowCount === 0) return;
 		const needLoading = [];
