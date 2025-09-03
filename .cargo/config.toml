@@ -2,5 +2,12 @@
 rustflags = [
     "-Csymbol-mangling-version=v0",
     # https://doc.rust-lang.org/rustc/codegen-options/index.html#split-debuginfo
-    "-Csplit-debuginfo=packed"
+    "-Csplit-debuginfo=packed",
+    "-Cpanic=abort",
 ]
+
+[unstable]
+# https://doc.rust-lang.org/cargo/reference/unstable.html#build-std
+# https://github.com/rust-lang/cargo/issues/15347
+build-std = ["core", "std", "alloc", "proc_macro", "panic_abort"]
+build-std-features = ["panic_immediate_abort"]
