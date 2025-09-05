@@ -10,8 +10,10 @@ import { useContextMenu } from './hooks/useContextMenu';
 import { ROW_HEIGHT, OVERSCAN_ROW_COUNT } from './constants';
 import { VirtualList } from './components/VirtualList';
 import { StateDisplay } from './components/StateDisplay';
+import { usePreventRefresh } from './hooks/usePreventRefresh';
 
 function App() {
+  usePreventRefresh();
   const { results, setResults, isInitialized, scannedFiles, processedEvents } = useAppState();
   const { colWidths, onResizeStart, autoFitColumns } = useColumnResize();
   const {
