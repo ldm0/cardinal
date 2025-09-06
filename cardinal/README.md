@@ -13,13 +13,8 @@
     - ctime
     - mtime
     - size
-- remove bincode, use postcard
-    - SlabNode::children 用 IndexSet
-    - name_index & MetadataCache::* 用 IndexSet 看看
-    - 性能不是特别好
 - metadata 启动后自动 fetching
 - Windows/NTFS 支持
-- 文件夹不显示文件大小
 - native 内存泄漏排查
 - native 内存占用高(mmap?)
     - namepool 和索引内存共享
@@ -36,8 +31,10 @@
             - 并行化 fsevent 的fs遍历部分，写数据部分抢锁
             - 只要有足够快速的 fsevent 处理，我们就可以做到搜索曾经曾经存在过的文件
             - 好像速度也能接受
-+ 加一个页面渲染文件体积 treemap
++ 加一个页面渲染文件体积 treemap, 支持钻取（点击文件夹展开子项）。
     + 磁盘整理需求
++ 右键菜单提供“打开”、“复制路径”、“在 Finder/Explorer 中显示”等选项。
+- 文件夹不显示文件大小
 
 ```bash
 npm run tauri dev -- --release --features dev
