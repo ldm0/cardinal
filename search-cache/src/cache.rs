@@ -21,16 +21,35 @@ use typed_num::Num;
 
 #[derive(Debug, Serialize, Deserialize, Encode, Decode)]
 pub struct SlabNode {
-    parent: Option<usize>,
+    parent: usize,
     children: Vec<usize>,
     name: String,
     metadata: SlabNodeMetadata,
 }
 
 impl SlabNode {
+    pub fn parent(&self) -> Option<usize> {
+        // slab index starts from 0, therefore we can say if parent is usize::MAX, it means no parent
+        // small and dirty size optimization :(
+        if self.parent == usize::MAX {
+            None
+        } else {
+            Some(self.parent)
+        }
+    }
+
     pub fn add_children(&mut self, children: usize) {
         if !self.children.iter().any(|&x| x == children) {
             self.children.push(children);
+        }
+    }
+
+    pub fn new(parent: Option<usize>, name: String, metadata: SlabNodeMetadata) -> Self {
+        Self {
+            parent: parent.unwrap_or(usize::MAX),
+            children: vec![],
+            name,
+            metadata,
         }
     }
 }
@@ -309,7 +328,7 @@ impl SearchCache {
     pub fn node_path(&self, index: usize) -> Option<PathBuf> {
         let mut current = index;
         let mut segments = vec![];
-        while let Some(parent) = self.slab.get(current)?.parent {
+        while let Some(parent) = self.slab.get(current)?.parent() {
             segments.push(self.slab.get(current)?.name.clone());
             current = parent;
         }
@@ -378,15 +397,14 @@ impl SearchCache {
                 let metadata = std::fs::symlink_metadata(&current_path)
                     .map(NodeMetadata::from)
                     .ok();
-                let node = SlabNode {
-                    parent: Some(current),
-                    children: vec![],
+                let node = SlabNode::new(
+                    Some(current),
                     name,
-                    metadata: match metadata {
+                    match metadata {
                         Some(metadata) => SlabNodeMetadata::Some(metadata),
                         None => SlabNodeMetadata::Unaccessible,
                     },
-                };
+                );
                 let index = self.push_node(node);
                 self.slab[current].add_children(index);
                 index
@@ -477,7 +495,7 @@ impl SearchCache {
         }
 
         // Remove parent reference, make whole subtree unreachable.
-        if let Some(parent) = self.slab[index].parent {
+        if let Some(parent) = self.slab[index].parent() {
             self.slab[parent].children.retain(|&x| x != index);
         }
         let mut stack = vec![index];
@@ -759,16 +777,11 @@ pub enum HandleFSEError {
 
 /// Note: This function is expected to be called with WalkData which metadata is not fetched.
 fn construct_node_slab(parent: Option<usize>, node: &Node, slab: &mut Slab<SlabNode>) -> usize {
-    let slab_node = SlabNode {
-        parent,
-        children: vec![],
-        name: node.name.clone(),
-        // This function is expected to be called with WalkData which metadata is not fetched.
-        metadata: match node.metadata {
-            Some(metadata) => SlabNodeMetadata::Some(metadata),
-            None => SlabNodeMetadata::None,
-        },
+    let metadata = match node.metadata {
+        Some(metadata) => SlabNodeMetadata::Some(metadata),
+        None => SlabNodeMetadata::None,
     };
+    let slab_node = SlabNode::new(parent, node.name.clone(), metadata);
     let index = slab.insert(slab_node);
     slab[index].children = node
         .children
@@ -788,16 +801,12 @@ impl SearchCache {
         parent: Option<usize>,
         node: &Node,
     ) -> usize {
-        let slab_node = SlabNode {
-            parent,
-            children: vec![],
-            name: node.name.clone(),
-            metadata: match node.metadata {
-                Some(metadata) => SlabNodeMetadata::Some(metadata),
-                // This function should only be called with Node fetched with metadata
-                None => SlabNodeMetadata::Unaccessible,
-            },
+        let metadata = match node.metadata {
+            Some(metadata) => SlabNodeMetadata::Some(metadata),
+            // This function should only be called with Node fetched with metadata
+            None => SlabNodeMetadata::Unaccessible,
         };
+        let slab_node = SlabNode::new(parent, node.name.clone(), metadata);
         let index = self.push_node(slab_node);
         self.slab[index].children = node
             .children
