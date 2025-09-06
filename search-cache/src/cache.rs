@@ -624,7 +624,7 @@ impl SearchCache {
     }
 }
 
-#[derive(Serialize, Deserialize, Encode, Decode)]
+#[derive(Encode, Decode)]
 pub struct MetadataCache {
     ctime_index: BTreeMap<NonZeroU64, Vec<usize>>,
     mtime_index: BTreeMap<NonZeroU64, Vec<usize>>,

@@ -1511,7 +1511,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de97285b9f977c998caea1a10d20484ddaf3938a2f224c59f7c2bf3a8d19b7f9"
 dependencies = [
- "serde",
+ "bincode",
 ]
 
 [[package]]

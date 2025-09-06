@@ -8,13 +8,13 @@ fswalk = { path = "../fswalk" }
 namepool = { path = "../namepool" }
 cardinal-sdk = { path = "../cardinal-sdk" }
 query-segmentation = { path = "../query-segmentation" }
-bincode = { version = "2", features = ["serde"] }
+bincode = "2"
 zstd = { version = "0.13", features = ["zstdmt"] }
 serde = { version = "1", features = ["derive"] }
 slab = { git = "https://github.com/ldm0/slab", branch = "bincode_support", features = ["serde", "bincode"] }
 anyhow = "1.0.97"
 crossbeam-channel = "0.5.15"
-typed-num = { version = "0.3.0", default-features = false, features = ["serde"] }
+typed-num = { version = "0.3.0", default-features = false, features = ["bincode"] }
 tracing = "0.1"
 
 [dev-dependencies]
