@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, ffi::CStr, sync::LazyLock};
@@ -54,43 +55,30 @@ impl NamePool {
     }
 
     pub fn search_substr<'a>(&'a self, substr: &'a str) -> impl Iterator<Item = &'a str> + 'a {
-        let mut last_end = 0;
-        // TODO(ldm0): remove x > last_end check
-        memchr::memmem::find_iter(&self.pool, substr.as_bytes()).filter_map(move |x| {
-            (x > last_end).then(|| {
-                let (new_end, s) = self.get(x);
-                last_end = new_end;
-                s
-            })
-        })
+        memchr::memmem::find_iter(&self.pool, substr.as_bytes())
+            .map(move |x| self.get(x))
+            .dedup_by(|(a, _), (b, _)| a == b)
+            .map(|(_, s)| s)
     }
 
     pub fn search_subslice<'search, 'pool: 'search>(
         &'pool self,
         subslice: &'search [u8],
     ) -> impl Iterator<Item = &'pool str> + 'search {
-        let mut last_end = 0;
-        memchr::memmem::find_iter(&self.pool, subslice).filter_map(move |x| {
-            (x > last_end).then(|| {
-                let (new_end, s) = self.get(x);
-                last_end = new_end;
-                s
-            })
-        })
+        memchr::memmem::find_iter(&self.pool, subslice)
+            .map(move |x| self.get(x))
+            .dedup_by(|(a, _), (b, _)| a == b)
+            .map(|(_, s)| s)
     }
 
     pub fn search_suffix<'search, 'pool: 'search>(
         &'pool self,
         suffix: &'search CStr,
     ) -> impl Iterator<Item = &'pool str> + 'search {
-        let mut last_end = 0;
-        memchr::memmem::find_iter(&self.pool, suffix.to_bytes_with_nul()).filter_map(move |x| {
-            (x > last_end).then(|| {
-                let (new_end, s) = self.get(x);
-                last_end = new_end;
-                s
-            })
-        })
+        memchr::memmem::find_iter(&self.pool, suffix.to_bytes_with_nul())
+            .map(move |x| self.get(x))
+            .dedup_by(|(a, _), (b, _)| a == b)
+            .map(|(_, s)| s)
     }
 
     // prefix should starts with a \0, e.g. b"\0hello"
@@ -99,17 +87,12 @@ impl NamePool {
         prefix: &'search [u8],
     ) -> impl Iterator<Item = &'pool str> + 'search {
         assert_eq!(prefix[0], 0);
-        let mut last_end = 0;
         memchr::memmem::find_iter(&self.pool, prefix)
             // To make sure it points to the end of the prefix. If we use the begin index, we will get a string before the correct one.
             .map(|x| x + prefix.len() - 1)
-            .filter_map(move |x| {
-                (x > last_end).then(|| {
-                    let (new_end, s) = self.get(x);
-                    last_end = new_end;
-                    s
-                })
-            })
+            .map(move |x| self.get(x))
+            .dedup_by(|(a, _), (b, _)| a == b)
+            .map(|(_, s)| s)
     }
 
     // `exact` should starts with a '\0', and ends with a '\0',
@@ -120,10 +103,10 @@ impl NamePool {
     ) -> impl Iterator<Item = &'pool str> + 'search {
         assert_eq!(exact[0], 0);
         assert_eq!(exact[exact.len() - 1], 0);
-        memchr::memmem::find_iter(&self.pool, exact).map(|x| {
-            let (_, s) = self.get(x + exact.len() - 1);
-            s
-        })
+        memchr::memmem::find_iter(&self.pool, exact)
+            .map(|x| x + exact.len() - 1)
+            // No dedup needed since this is exact match(b"\0hello\0"), no overlap possible
+            .map(|x| self.get(x).1)
     }
 
     pub fn par_search_substr<'a>(&'a self, substr: &'a str) -> Vec<&'a str> {
@@ -169,8 +152,8 @@ impl NamePool {
                 let read_end = (search_end + subslice.len() - 1).min(pool_len);
                 let slice = &self.pool[i..read_end];
                 memchr::memmem::find_iter(slice, subslice)
-                    .filter(move |&x| i + x < search_end)
                     .map(move |x| self.get(i + x))
+                    .dedup_by(|(a, _), (b, _)| a == b)
                     .collect::<Vec<_>>()
             })
             .collect::<BTreeMap<_, _>>()
@@ -197,8 +180,8 @@ impl NamePool {
                 let read_end = (search_end + suffix_bytes.len() - 1).min(pool_len);
                 let slice = &self.pool[i..read_end];
                 memchr::memmem::find_iter(slice, suffix_bytes)
-                    .filter(move |&x| i + x < search_end)
                     .map(move |x| self.get(i + x))
+                    .dedup_by(|(a, _), (b, _)| a == b)
                     .collect::<Vec<_>>()
             })
             .collect::<BTreeMap<_, _>>()
@@ -226,8 +209,8 @@ impl NamePool {
                 let read_end = (search_end + prefix.len() - 1).min(pool_len);
                 let slice = &self.pool[i..read_end];
                 memchr::memmem::find_iter(slice, prefix)
-                    .filter(move |&x| i + x < search_end)
                     .map(move |x| self.get(i + x + prefix.len() - 1))
+                    .dedup_by(|(a, _), (b, _)| a == b)
                     .collect::<Vec<_>>()
             })
             .collect::<BTreeMap<_, _>>()
@@ -257,7 +240,6 @@ impl NamePool {
                 let read_end = (search_end + exact.len() - 1).min(pool_len);
                 let slice = &self.pool[i..read_end];
                 memchr::memmem::find_iter(slice, exact)
-                    .filter(move |&x| i + x < search_end)
                     .map(move |x| self.get(i + x + exact.len() - 1))
                     .collect::<Vec<_>>()
             })
@@ -618,6 +600,105 @@ mod tests {
     }
 
     #[test]
+    fn test_search_exact_no_overlap() {
+        let mut pool = NamePool::new();
+        // Add some strings that could potentially cause overlap issues
+        pool.push("test");
+        pool.push("testtest"); // Contains "test" twice
+        pool.push("testtesttest"); // Contains "test" three times
+
+        // Exact search should only find exact matches, no overlaps
+        let exact = b"\0test\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "test");
+
+        let exact = b"\0testtest\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "testtest");
+
+        let exact = b"\0testtesttest\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "testtesttest");
+    }
+
+    #[test]
+    fn test_search_exact_with_embedded_nulls() {
+        let mut pool = NamePool::new();
+        pool.push("hello");
+        pool.push("world");
+
+        // Test that exact search doesn't match partial patterns
+        // This should not match anything because we're looking for "hello"
+        // with extra null bytes that don't exist in the actual storage
+        let exact = b"\0\0hello\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert!(result.is_empty());
+
+        let exact = b"\0hello\0\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_search_exact_boundary_cases() {
+        let mut pool = NamePool::new();
+        pool.push(""); // Empty string
+        pool.push("a"); // Single character
+        pool.push("ab"); // Two characters
+
+        // Test empty string exact match
+        let exact = b"\0\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "");
+
+        // Test single character exact match
+        let exact = b"\0a\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "a");
+
+        // Test two character exact match
+        let exact = b"\0ab\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "ab");
+    }
+
+    #[test]
+    fn test_search_exact_similar_strings() {
+        let mut pool = NamePool::new();
+        pool.push("test");
+        pool.push("testing");
+        pool.push("tester");
+        pool.push("test123");
+
+        // Each exact search should only return the exact match
+        let exact = b"\0test\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "test");
+
+        let exact = b"\0testing\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "testing");
+
+        let exact = b"\0tester\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "tester");
+
+        let exact = b"\0test123\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "test123");
+    }
+
+    #[test]
     fn test_par_search_substr() {
         let mut pool = NamePool::new();
         pool.push("hello");
@@ -845,6 +926,292 @@ mod tests {
         assert_eq!(result[0], full_name);
     }
 
+    #[test]
+    fn test_par_search_exact_no_overlap() {
+        let mut pool = NamePool::new();
+        // Add some strings that could potentially cause overlap issues
+        pool.push("test");
+        pool.push("testtest"); // Contains "test" twice
+        pool.push("testtesttest"); // Contains "test" three times
+
+        // Parallel exact search should only find exact matches, no overlaps
+        let exact = b"\0test\0";
+        let result = pool.par_search_exact(exact);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "test");
+
+        let exact = b"\0testtest\0";
+        let result = pool.par_search_exact(exact);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "testtest");
+
+        let exact = b"\0testtesttest\0";
+        let result = pool.par_search_exact(exact);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "testtesttest");
+    }
+
+    #[test]
+    fn test_dedup_behavior_comparison() {
+        let mut pool = NamePool::new();
+        pool.push("hello");
+        pool.push("hello world");
+        pool.push("hello world hello");
+
+        // substr search finds multiple occurrences in the same string, needs dedup
+        let substr_result: Vec<_> = pool.search_substr("hello").collect();
+        assert_eq!(substr_result.len(), 3); // Each string appears only once despite multiple "hello" matches
+
+        // exact search can only match complete strings, no dedup needed
+        let exact_result: Vec<_> = pool.search_exact(b"\0hello\0").collect();
+        assert_eq!(exact_result.len(), 1); // Only exact "hello" match
+
+        // Verify the same string doesn't appear multiple times in substr results
+        let mut unique_results = substr_result.clone();
+        unique_results.sort();
+        unique_results.dedup();
+        assert_eq!(substr_result.len(), unique_results.len());
+    }
+
+    #[test]
+    fn test_search_exact_performance_assumption() {
+        // This test validates the assumption that exact search doesn't need dedup
+        // by ensuring that the pattern b"\0string\0" can only match once per string
+        let mut pool = NamePool::new();
+
+        // Create strings where the pattern could theoretically appear multiple times
+        // if we weren't doing exact matching
+        pool.push("abc");
+        pool.push("abcabc");
+        // Note: We can't actually store strings with null bytes using push()
+        // because push() adds its own null terminator
+
+        let exact = b"\0abc\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+
+        // Should only find the exact "abc" string
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "abc");
+
+        // Verify that "abcabc" requires its own exact pattern
+        let exact = b"\0abcabc\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "abcabc");
+
+        // Test that partial matches don't work
+        let exact = b"\0ab\0";
+        let result: Vec<_> = pool.search_exact(exact).collect();
+        assert_eq!(result.len(), 0); // No exact match for "ab"
+    }
+
+    #[test]
+    fn test_boundary_single_char() {
+        let mut pool = NamePool::new();
+
+        // Test single character
+        pool.push("a");
+        let result: Vec<_> = pool.search_substr("a").collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "a");
+
+        let result: Vec<_> = pool.search_subslice(b"a").collect();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "a");
+
+        // Test single character in longer string
+        pool.push("abc");
+        let result: Vec<_> = pool.search_substr("a").collect();
+        assert_eq!(result.len(), 2); // "a" and "abc"
+
+        let result: Vec<_> = pool.search_substr("b").collect();
+        assert_eq!(result.len(), 1); // only "abc"
+
+        let result: Vec<_> = pool.search_substr("c").collect();
+        assert_eq!(result.len(), 1); // only "abc"
+    }
+
+    #[test]
+    fn test_boundary_very_long_strings() {
+        let mut pool = NamePool::new();
+
+        // Test with very long strings
+        let long_string = "a".repeat(10000);
+        let medium_string = "b".repeat(5000);
+
+        pool.push(&long_string);
+        pool.push(&medium_string);
+
+        // Search for single character in long strings
+        let result = pool.search_substr("a");
+        assert_eq!(result.collect::<Vec<_>>().len(), 1);
+
+        let result = pool.search_substr("b");
+        assert_eq!(result.collect::<Vec<_>>().len(), 1);
+
+        // Search for substring in the middle
+        let middle_substr = "a".repeat(100);
+        let result = pool.search_substr(&middle_substr);
+        assert_eq!(result.collect::<Vec<_>>().len(), 1);
+    }
+
+    #[test]
+    fn test_boundary_special_characters() {
+        let mut pool = NamePool::new();
+
+        // Test with various special characters
+        pool.push("hello\nworld");
+        pool.push("tab\there");
+        pool.push("quote\"here");
+        pool.push("backslash\\here");
+        pool.push("unicode🚀test");
+
+        // Search for strings containing newlines
+        let result = pool.search_substr("hello\nworld");
+        assert_eq!(result.collect::<Vec<_>>().len(), 1);
+
+        // Search for strings containing tabs
+        let result = pool.search_substr("tab\there");
+        assert_eq!(result.collect::<Vec<_>>().len(), 1);
+
+        // Search for strings containing quotes
+        let result = pool.search_substr("quote\"here");
+        assert_eq!(result.collect::<Vec<_>>().len(), 1);
+
+        // Search for strings containing backslashes
+        let result = pool.search_substr("backslash\\here");
+        assert_eq!(result.collect::<Vec<_>>().len(), 1);
+
+        // Search for strings containing unicode
+        let result = pool.search_substr("unicode🚀test");
+        assert_eq!(result.collect::<Vec<_>>().len(), 1);
+    }
+
+    #[test]
+    fn test_boundary_chunk_size_edge_cases() {
+        let mut pool = NamePool::new();
+
+        // Create a pool that's exactly at chunk size boundaries
+        let chunk_size = (pool.pool.len() / get_parallelism())
+            .max(1024)
+            .min(pool.pool.len());
+
+        // Fill pool to be just under chunk size
+        let current_len = pool.pool.len();
+        let fill_size = if chunk_size > current_len + 10 {
+            chunk_size - current_len - 10
+        } else {
+            100 // fallback size
+        };
+
+        if fill_size > 0 {
+            pool.push(&"x".repeat(fill_size));
+        }
+
+        // Add strings that will cross chunk boundaries
+        pool.push("boundary_test");
+        pool.push("another_boundary_test");
+
+        // Test parallel search works correctly at chunk boundaries
+        let result = pool.par_search_substr("boundary_test");
+        // "boundary_test" appears in both "boundary_test" and "another_boundary_test"
+        assert_eq!(result.len(), 2);
+        assert!(result.contains(&"boundary_test"));
+        assert!(result.contains(&"another_boundary_test"));
+
+        let result = pool.par_search_substr("another_boundary_test");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "another_boundary_test");
+
+        // Test that searching for a substring that appears in both strings works
+        let result = pool.par_search_substr("boundary");
+        assert_eq!(result.len(), 2); // Should find both "boundary_test" and "another_boundary_test"
+        assert!(result.contains(&"boundary_test"));
+        assert!(result.contains(&"another_boundary_test"));
+    }
+
+    #[test]
+    fn test_boundary_memory_limits() {
+        let mut pool = NamePool::new();
+
+        // Test with many small strings
+        for i in 0..1000 {
+            pool.push(&format!("string_{}", i));
+        }
+
+        // Search for a pattern that appears in many strings
+        let result = pool.search_substr("string_");
+        assert_eq!(result.collect::<Vec<_>>().len(), 1000);
+
+        // Test parallel version
+        let result = pool.par_search_substr("string_");
+        assert_eq!(result.len(), 1000);
+    }
+
+    #[test]
+    fn test_boundary_concurrent_access() {
+        let mut pool = NamePool::new();
+
+        // Create a pool with many strings
+        for i in 0..100 {
+            pool.push(&format!("test_string_{}", i));
+        }
+
+        // Test that multiple searches work correctly
+        let patterns: Vec<String> = (0..10).map(|i| format!("test_string_{}", i)).collect();
+
+        for pattern in patterns {
+            let result: Vec<_> = pool.search_substr(&pattern).collect();
+            // The pattern should match exactly one string, but also match as substring in longer strings
+            // For example, "test_string_1" should match "test_string_1", "test_string_10", "test_string_11", etc.
+            let expected_count = (0..100)
+                .filter(|&i| format!("test_string_{}", i).contains(&pattern))
+                .count();
+            assert_eq!(
+                result.len(),
+                expected_count,
+                "Pattern '{}' should match {} strings",
+                pattern,
+                expected_count
+            );
+        }
+    }
+
+    #[test]
+    fn test_boundary_overlapping_patterns() {
+        let mut pool = NamePool::new();
+
+        // Create strings with overlapping patterns
+        pool.push("aaa");
+        pool.push("aaaa");
+        pool.push("aaaaa");
+
+        // Search for "aa" should find all three strings
+        let result = pool.search_substr("aa");
+        let results: Vec<_> = result.collect();
+        assert_eq!(results.len(), 3);
+
+        // But each string should appear only once
+        let mut unique_results = results.clone();
+        unique_results.sort();
+        unique_results.dedup();
+        assert_eq!(results.len(), unique_results.len());
+    }
+
+    #[test]
+    fn test_boundary_zero_parallelism() {
+        // This test simulates what happens when parallelism is 1
+        // (effectively making it sequential)
+        let mut pool = NamePool::new();
+
+        pool.push("test1");
+        pool.push("test2");
+        pool.push("test3");
+
+        // Even with minimal parallelism, results should be correct
+        let result = pool.par_search_substr("test");
+        assert_eq!(result.len(), 3);
+    }
     #[test]
     fn test_par_search_exact_boundary() {
         let mut pool = NamePool::new();

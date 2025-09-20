@@ -7,3 +7,4 @@ edition = "2024"
 memchr = "2"
 rayon = "1"
 serde = { version = "1", features = ["derive"] }
+itertools = "0.14"
