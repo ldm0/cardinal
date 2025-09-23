@@ -40,8 +40,5 @@ default = []
 # https://v2.tauri.app/develop/debug/#enable-devtools-feature
 dev = ["tauri/devtools"]
 
-[target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator = "0.6"
-
 # [profile.release]
 # strip = true
