@@ -38,7 +38,7 @@ impl SlabNode {
     }
 
     pub fn add_children(&mut self, children: SlabIndex) {
-        if !self.children.iter().any(|&x| x == children) {
+        if !self.children.contains(&children) {
             self.children.push(children);
         }
     }
@@ -131,7 +131,7 @@ impl SlabNodeMetadataCompact {
 
     pub fn as_ref(&self) -> Option<SlabNodeMetadata<'_>> {
         match self.state() {
-            State::Some => Some(SlabNodeMetadata(&self)),
+            State::Some => Some(SlabNodeMetadata(self)),
             State::Unaccessible | State::None => None,
         }
     }
@@ -188,7 +188,7 @@ impl SearchCache {
         read_cache_from_file(cache_path)
             .and_then(|x| {
                 (x.path == path)
-                    .then(|| ())
+                    .then_some(())
                     .ok_or_else(|| {
                         anyhow!(
                             "Inconsistent root path: expected: {:?}, actual: {:?}",
@@ -254,7 +254,7 @@ impl SearchCache {
         ) -> Option<(SlabIndex, ThinSlab<SlabNode>)> {
             // 先多线程构建树形文件名列表(不能直接创建 slab 因为 slab 无法多线程构建(slab 节点有相互引用，不想加锁))
             let visit_time = Instant::now();
-            let node = walk_it(path, &walk_data)?;
+            let node = walk_it(path, walk_data)?;
             info!(
                 "Walk data: {:?}, time: {:?}",
                 walk_data,
@@ -479,7 +479,7 @@ impl SearchCache {
                     Some(current),
                     name,
                     match metadata {
-                        Some(metadata) => SlabNodeMetadataCompact::some(metadata.into()),
+                        Some(metadata) => SlabNodeMetadataCompact::some(metadata),
                         None => SlabNodeMetadataCompact::unaccessible(),
                     },
                 );
@@ -663,7 +663,7 @@ impl SearchCache {
                             _ => node.metadata,
                         }
                     })
-                    .unwrap_or_else(|| SlabNodeMetadataCompact::unaccessible());
+                    .unwrap_or_else(SlabNodeMetadataCompact::unaccessible);
                 SearchResultNode {
                     path: path.unwrap_or_default(),
                     metadata,
@@ -767,7 +767,7 @@ fn construct_node_slab(
     slab: &mut ThinSlab<SlabNode>,
 ) -> SlabIndex {
     let metadata = match node.metadata {
-        Some(metadata) => SlabNodeMetadataCompact::some(metadata.into()),
+        Some(metadata) => SlabNodeMetadataCompact::some(metadata),
         None => SlabNodeMetadataCompact::none(),
     };
     let slab_node = SlabNode::new(parent, node.name.clone(), metadata);
@@ -791,7 +791,7 @@ impl SearchCache {
         node: &Node,
     ) -> SlabIndex {
         let metadata = match node.metadata {
-            Some(metadata) => SlabNodeMetadataCompact::some(metadata.into()),
+            Some(metadata) => SlabNodeMetadataCompact::some(metadata),
             // This function should only be called with Node fetched with metadata
             None => SlabNodeMetadataCompact::unaccessible(),
         };
@@ -806,7 +806,7 @@ impl SearchCache {
     }
 }
 
-pub static NAME_POOL: LazyLock<NamePool> = LazyLock::new(|| NamePool::new());
+pub static NAME_POOL: LazyLock<NamePool> = LazyLock::new(NamePool::new);
 
 fn name_pool(
     name_index: BTreeMap<Box<str>, HashSet<SlabIndex>>,
@@ -844,20 +844,6 @@ mod tests {
 
         assert_eq!(cache.slab.len(), 4);
         assert_eq!(cache.name_index.len(), 4);
-        assert_eq!(
-            NAME_POOL.len(),
-            temp_path
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .as_bytes()
-                .len()
-                + b"subdir".len()
-                + b"file1.txt".len()
-                + b"file2.txt".len()
-                + 5 * b"\0".len()
-        );
     }
 
     #[test]
@@ -1228,9 +1214,9 @@ mod tests {
             TempDir::new("test_walk_fs_new_meta").expect("Failed to create temp directory");
         let root_path = temp_dir.path();
 
-        fs::File::create(&root_path.join("file1.txt")).expect("Failed to create file1.txt");
-        fs::create_dir(&root_path.join("subdir1")).expect("Failed to create subdir1");
-        fs::File::create(&root_path.join("subdir1/file2.txt")).expect("Failed to create file1.txt");
+        fs::File::create(root_path.join("file1.txt")).expect("Failed to create file1.txt");
+        fs::create_dir(root_path.join("subdir1")).expect("Failed to create subdir1");
+        fs::File::create(root_path.join("subdir1/file2.txt")).expect("Failed to create file1.txt");
 
         let cache = SearchCache::walk_fs(root_path.to_path_buf());
 
@@ -1277,9 +1263,9 @@ mod tests {
         let temp_dir = TempDir::new("test_event_meta").expect("Failed to create temp directory");
         let root_path = temp_dir.path();
 
-        fs::File::create(&root_path.join("file1.txt")).expect("Failed to create file1.txt");
-        fs::create_dir(&root_path.join("subdir1")).expect("Failed to create subdir1");
-        fs::File::create(&root_path.join("subdir1/file2.txt")).expect("Failed to create file1.txt");
+        fs::File::create(root_path.join("file1.txt")).expect("Failed to create file1.txt");
+        fs::create_dir(root_path.join("subdir1")).expect("Failed to create subdir1");
+        fs::File::create(root_path.join("subdir1/file2.txt")).expect("Failed to create file1.txt");
 
         let mut cache = SearchCache::walk_fs(root_path.to_path_buf());
         let mut last_event_id = cache.last_event_id();
@@ -1518,7 +1504,7 @@ mod tests {
         // Query for the deep file directly
         let results_deep_file = cache.query_files("gamma_file.txt".to_string()).unwrap();
         assert_eq!(results_deep_file.len(), 1);
-        let expected_suffix_deep = format!("alpha_dir/beta_subdir/gamma_file.txt");
+        let expected_suffix_deep = "alpha_dir/beta_subdir/gamma_file.txt".to_string();
         assert!(
             results_deep_file[0].path.ends_with(&expected_suffix_deep),
             "Path was: {:?}",

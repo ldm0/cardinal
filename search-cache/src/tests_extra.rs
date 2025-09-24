@@ -67,14 +67,14 @@ mod extra {
         assert_eq!(q1.len(), 1);
         assert!(q1[0].metadata.is_none());
         // expand_file_nodes should fetch metadata
-        let nodes = cache.expand_file_nodes(idxs.iter().copied().collect());
+        let nodes = cache.expand_file_nodes(idxs.to_vec());
         assert_eq!(nodes.len(), 1);
         assert!(
             nodes[0].metadata.is_some(),
             "metadata should be fetched on demand"
         );
         // A second expand should still have metadata (cached)
-        let nodes2 = cache.expand_file_nodes(idxs.iter().copied().collect());
+        let nodes2 = cache.expand_file_nodes(idxs.to_vec());
         assert!(nodes2[0].metadata.is_some());
     }
 

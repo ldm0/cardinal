@@ -15,7 +15,7 @@ impl OptionSlabIndex {
     }
 
     pub fn from_option(index: Option<SlabIndex>) -> Self {
-        index.map_or(Self::none(), |x| Self::some(x))
+        index.map_or(Self::none(), Self::some)
     }
 
     pub fn to_option(self) -> Option<SlabIndex> {
@@ -54,6 +54,12 @@ impl SlabIndex {
 #[serde(transparent)]
 #[repr(transparent)]
 pub struct ThinSlab<T>(slab::Slab<T>);
+
+impl<T> Default for ThinSlab<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl<T> ThinSlab<T> {
     pub fn new() -> Self {

@@ -39,7 +39,7 @@ fn main() -> Result<()> {
         })
     };
 
-    println!("Cache is: {:?}", cache);
+    println!("Cache is: {cache:?}");
 
     let (finish_tx, finish_rx) = bounded::<Sender<SearchCache>>(1);
     let (search_tx, search_rx) = unbounded::<String>();
@@ -112,7 +112,7 @@ fn main() -> Result<()> {
     let (cache_tx, cache_rx) = bounded::<SearchCache>(1);
     finish_tx.send(cache_tx).context("cache_tx is closed")?;
     let cache = cache_rx.recv().context("cache_tx is closed")?;
-    println!("start writing cache: {:?}", cache);
+    println!("start writing cache: {cache:?}");
     cache
         .flush_to_file(Path::new(CACHE_PATH))
         .context("Failed to write cache to file")?;

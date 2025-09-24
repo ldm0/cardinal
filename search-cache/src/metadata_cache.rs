@@ -24,7 +24,7 @@ impl MetadataCache {
     pub fn insert(&mut self, index: usize, metadata: SlabNodeMetadataCompact) {
         if let Some(ctime) = metadata.as_ref().and_then(|x| x.ctime()) {
             if let Some(indexes) = self.ctime_index.get_mut(&ctime) {
-                if !indexes.iter().any(|&x| x == index) {
+                if !indexes.contains(&index) {
                     indexes.push(index);
                 }
             } else {
@@ -35,7 +35,7 @@ impl MetadataCache {
         }
         if let Some(mtime) = metadata.as_ref().and_then(|x| x.mtime()) {
             if let Some(indexes) = self.mtime_index.get_mut(&mtime) {
-                if !indexes.iter().any(|&x| x == index) {
+                if !indexes.contains(&index) {
                     indexes.push(index);
                 }
             } else {
@@ -46,7 +46,7 @@ impl MetadataCache {
         }
         if let Some(size) = metadata.as_ref().map(|x| x.size()) {
             if let Some(indexes) = self.size_index.get_mut(&size) {
-                if !indexes.iter().any(|&x| x == index) {
+                if !indexes.contains(&index) {
                     indexes.push(index);
                 }
             } else {

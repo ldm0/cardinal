@@ -44,13 +44,7 @@ fn main() {
             let time = chrono::DateTime::from_timestamp(timestamp, 0)
                 .unwrap()
                 .with_timezone(&timezone);
-            println!(
-                "{}, {}, {:?}, {:?}",
-                time.to_string(),
-                event.id,
-                event.path,
-                event.flag
-            );
+            println!("{}, {}, {:?}, {:?}", time, event.id, event.path, event.flag);
         }
     }
 }

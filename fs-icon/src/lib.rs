@@ -55,12 +55,12 @@ pub fn icon_of_path_ns(path: &str) -> Option<Vec<u8>> {
                                 true.into()
                             }),
                         );
-                        return Some(
-                            NSBitmapImageRep::imageRepWithData(&*new_image.TIFFRepresentation()?)?
-                                .representationUsingType_properties(
-                                    NSBitmapImageFileType::PNG,
-                                    &NSDictionary::new(),
-                                )?,
+                        return NSBitmapImageRep::imageRepWithData(
+                            &*new_image.TIFFRepresentation()?,
+                        )?
+                        .representationUsingType_properties(
+                            NSBitmapImageFileType::PNG,
+                            &NSDictionary::new(),
                         );
                     }
                 }
@@ -83,13 +83,11 @@ pub fn icon_of_path_ns(path: &str) -> Option<Vec<u8>> {
                         true.into()
                     }),
                 );
-                return Some(
-                    NSBitmapImageRep::imageRepWithData(&*new_image.TIFFRepresentation()?)?
-                        .representationUsingType_properties(
-                            NSBitmapImageFileType::PNG,
-                            &NSDictionary::new(),
-                        )?,
-                );
+                NSBitmapImageRep::imageRepWithData(&*new_image.TIFFRepresentation()?)?
+                    .representationUsingType_properties(
+                        NSBitmapImageFileType::PNG,
+                        &NSDictionary::new(),
+                    )
             }
         })()?;
         Some(png_data.to_vec())
@@ -99,7 +97,7 @@ pub fn icon_of_path_ns(path: &str) -> Option<Vec<u8>> {
 pub fn image_dimension(image_path: &str) -> Option<(f64, f64)> {
     // https://stackoverflow.com/questions/6468747/get-image-width-and-height-before-loading-it-completely-in-iphone
     objc2::rc::autoreleasepool(|_| -> Option<(f64, f64)> {
-        let path_cf_url = CFURL::from_file_path(&image_path)?;
+        let path_cf_url = CFURL::from_file_path(image_path)?;
         unsafe {
             let image_source = CGImageSource::with_url(&path_cf_url, None)?;
             let image_header = image_source.properties_at_index(0, None)?;

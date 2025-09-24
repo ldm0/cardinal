@@ -122,7 +122,7 @@ pub fn walk_it(dir: &Path, walk_data: &WalkData) -> Option<Node> {
 }
 
 fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
-    if walk_data.ignore_directory.as_deref() == Some(path) {
+    if walk_data.ignore_directory == Some(path) {
         return None;
     }
     // doesn't traverse symlink
@@ -142,7 +142,7 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
     };
     let children = if metadata.as_ref().map(|x| x.is_dir()).unwrap_or_default() {
         walk_data.num_dirs.fetch_add(1, Ordering::Relaxed);
-        let read_dir = fs::read_dir(&path);
+        let read_dir = fs::read_dir(path);
         match read_dir {
             Ok(entries) => entries
                 .into_iter()
@@ -157,7 +157,7 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
                             {
                                 return None;
                             }
-                            if walk_data.ignore_directory.as_deref() == Some(path) {
+                            if walk_data.ignore_directory == Some(path) {
                                 return None;
                             }
                             // doesn't traverse symlink
@@ -367,7 +367,7 @@ mod tests {
                 done.store(true, Ordering::Relaxed);
             });
             s.spawn(|| {
-                while done.load(Ordering::Relaxed) == false {
+                while !done.load(Ordering::Relaxed) {
                     let files = walk_data.num_files.load(Ordering::Relaxed);
                     let dirs = walk_data.num_dirs.load(Ordering::Relaxed);
                     println!("so far: {files} files, {dirs} dirs");
@@ -393,7 +393,7 @@ mod tests {
                 done.store(true, Ordering::Relaxed);
             });
             s.spawn(|| {
-                while done.load(Ordering::Relaxed) == false {
+                while !done.load(Ordering::Relaxed) {
                     let files = walk_data.num_files.load(Ordering::Relaxed);
                     let dirs = walk_data.num_dirs.load(Ordering::Relaxed);
                     println!("so far: {files} files, {dirs} dirs");
@@ -422,7 +422,7 @@ mod tests {
                 std::thread::sleep(std::time::Duration::from_millis(100));
                 let time = Instant::now();
                 cancel.store(true, Ordering::Relaxed);
-                while done.load(Ordering::Relaxed) == false {
+                while !done.load(Ordering::Relaxed) {
                     std::thread::yield_now();
                 }
                 // Ensure cancellation happened quickly

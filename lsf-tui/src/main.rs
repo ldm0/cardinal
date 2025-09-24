@@ -23,6 +23,12 @@ pub struct App {
     exit: bool,
 }
 
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl App {
     pub fn new() -> Self {
         Self {
@@ -63,13 +69,10 @@ impl App {
     fn query_cursor_move_back(&mut self) {
         if self.queries.get(self.query_cursor + 1).is_some() {
             self.query_cursor += 1;
-        } else {
-            if self.history.len() - 1 >= self.query_cursor {
-                if let Some(history) = self.history.get(self.history.len() - 1 - self.query_cursor)
-                {
-                    self.queries.push(history.clone());
-                    self.query_cursor += 1;
-                }
+        } else if self.history.len() > self.query_cursor {
+            if let Some(history) = self.history.get(self.history.len() - 1 - self.query_cursor) {
+                self.queries.push(history.clone());
+                self.query_cursor += 1;
             }
         }
     }
@@ -134,7 +137,7 @@ impl Widget for &App {
         ]);
         let result_lines = self.results.iter().map(|s| Line::from(s.clone()));
         let mut lines = vec![query_line];
-        lines.extend(result_lines.into_iter());
+        lines.extend(result_lines);
         let inner_text = Text::from(lines);
 
         Paragraph::new(inner_text).block(block).render(area, buf);

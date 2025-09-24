@@ -17,6 +17,22 @@ struct NamePoolInner<const CAPACITY: usize> {
     lines: Vec<CacheLine<CAPACITY>>,
 }
 
+impl std::fmt::Debug for NamePool<CACHE_LINE_CAPACITY> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NamePool")
+            .field("len", &self.len())
+            .field("lines", &self.inner.lock().filter)
+            .finish()
+    }
+}
+
+
+impl<const CAPACITY: usize> Default for NamePool<CAPACITY> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const CAPACITY: usize> NamePool<CAPACITY> {
     pub fn new() -> Self {
         Self {
@@ -42,7 +58,7 @@ impl<const CAPACITY: usize> NamePool<CAPACITY> {
     ///
     /// One important feature of NamePool is that the returned offset is stable
     /// and won't be overwritten.
-    pub fn push<'c, 's>(&'c self, name: &'s str) -> &'c str {
+    pub fn push<'c>(&'c self, name: &str) -> &'c str {
         let mut inner = self.inner.lock();
         if let Some(existing) = inner.filter.get(name) {
             return existing;
@@ -71,12 +87,11 @@ impl<const CAPACITY: usize> NamePool<CAPACITY> {
             .lock()
             .lines
             .iter()
-            .map(|x| {
+            .flat_map(|x| {
                 x.search_substr(substr)
                     .map(|s| unsafe { str::from_raw_parts(s.0, s.1) })
                     .collect::<Vec<_>>()
             })
-            .flatten()
             .collect()
     }
 
@@ -88,12 +103,10 @@ impl<const CAPACITY: usize> NamePool<CAPACITY> {
             .lock()
             .lines
             .iter()
-            .map(|x| {
+            .flat_map(|x| {
                 x.search_subslice(subslice)
                     .map(|s| unsafe { str::from_raw_parts(s.0, s.1) })
-                    .collect::<Vec<_>>()
             })
-            .flatten()
             .collect()
     }
 
@@ -105,12 +118,10 @@ impl<const CAPACITY: usize> NamePool<CAPACITY> {
             .lock()
             .lines
             .iter()
-            .map(|x| {
+            .flat_map(|x| {
                 x.search_suffix(suffix)
                     .map(|s| unsafe { str::from_raw_parts(s.0, s.1) })
-                    .collect::<Vec<_>>()
             })
-            .flatten()
             .collect()
     }
 
@@ -123,12 +134,10 @@ impl<const CAPACITY: usize> NamePool<CAPACITY> {
             .lock()
             .lines
             .iter()
-            .map(|x| {
+            .flat_map(|x| {
                 x.search_prefix(prefix)
                     .map(|s| unsafe { str::from_raw_parts(s.0, s.1) })
-                    .collect::<Vec<_>>()
             })
-            .flatten()
             .collect()
     }
 
@@ -142,12 +151,10 @@ impl<const CAPACITY: usize> NamePool<CAPACITY> {
             .lock()
             .lines
             .iter()
-            .map(|x| {
+            .flat_map(|x| {
                 x.search_exact(exact)
                     .map(|s| unsafe { str::from_raw_parts(s.0, s.1) })
-                    .collect::<Vec<_>>()
             })
-            .flatten()
             .collect()
     }
 }
@@ -239,7 +246,7 @@ mod tests {
         pool.push("world");
         pool.push("hello world");
 
-        let suffix = CStr::from_bytes_with_nul(b"world\0").unwrap();
+        let suffix = c"world";
         let result = pool.search_suffix(suffix);
         assert_eq!(result.len(), 2);
         assert!(result.contains("world"));
@@ -630,7 +637,7 @@ mod tests {
         let pool = NamePool::<1024>::new();
         // Fill with small strings first
         for i in 0..50 {
-            pool.push(&format!("str{}", i));
+            pool.push(&format!("str{i}"));
         }
 
         // Try to add a very long string that might not fit
@@ -687,12 +694,12 @@ mod tests {
         let pool = NamePool::<1024>::new();
         // Fill first cache line
         for i in 0..100 {
-            pool.push(&format!("line1_{}", i));
+            pool.push(&format!("line1_{i}"));
         }
 
         // Add to second cache line
         for i in 0..100 {
-            pool.push(&format!("line2_{}", i));
+            pool.push(&format!("line2_{i}"));
         }
 
         // Search should work across all cache lines
@@ -728,13 +735,13 @@ mod tests {
         assert_eq!(result.len(), 1); // "abcd"
 
         // Test suffix searches
-        let result = pool.search_suffix(std::ffi::CStr::from_bytes_with_nul(b"d\0").unwrap());
+        let result = pool.search_suffix(c"d");
         assert_eq!(result.len(), 1); // "abcd"
 
-        let result = pool.search_suffix(std::ffi::CStr::from_bytes_with_nul(b"c\0").unwrap());
+        let result = pool.search_suffix(c"c");
         assert_eq!(result.len(), 1); // "abc"
 
-        let result = pool.search_suffix(std::ffi::CStr::from_bytes_with_nul(b"bc\0").unwrap());
+        let result = pool.search_suffix(c"bc");
         assert_eq!(result.len(), 1); // "abc"
     }
 

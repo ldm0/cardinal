@@ -110,7 +110,6 @@ impl<const CAPACITY: usize> CacheLine<CAPACITY> {
 #[cfg(test)]
 mod cacheline_tests {
     use super::*;
-    use std::ffi::CStr;
 
     #[test]
     fn test_new_cacheline() {
@@ -201,7 +200,7 @@ mod cacheline_tests {
         let mut cl = CacheLine::<20>::new();
         let mut count = 0;
         loop {
-            let name = format!("x{}", count);
+            let name = format!("x{count}");
             if cl.push(&name).is_none() {
                 break;
             }
@@ -242,7 +241,7 @@ mod cacheline_tests {
         cl.push("file.txt");
         cl.push("data.txt");
 
-        let suffix = CStr::from_bytes_with_nul(b".txt\0").unwrap();
+        let suffix = c".txt";
         let results: Vec<_> = cl.search_suffix(suffix).collect();
         assert_eq!(results.len(), 2);
     }

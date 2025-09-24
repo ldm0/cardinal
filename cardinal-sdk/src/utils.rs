@@ -23,7 +23,7 @@ pub fn dev_of_path(path: &CStr) -> std::io::Result<dev_t> {
 pub fn last_event_id_before_time(dev: dev_t, timestamp: i64) -> u64 {
     // TODO(ldm0): Vec<dev_t, HashMap>, HashMap -> lru_cache
     thread_local! {
-        static DEV: RefCell<Option<dev_t>> = RefCell::new(None);
+        static DEV: RefCell<Option<dev_t>> = const { RefCell::new(None) };
         static CACHE: RefCell<HashMap<i64, u64>> = RefCell::new(HashMap::new());
     }
     // Ensure that device is the same for the whole thread.
