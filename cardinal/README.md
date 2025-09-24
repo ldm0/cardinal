@@ -51,12 +51,13 @@
     + APFS 文件名长度最大只有 255 个字节(Linux 文件系统也是)
         + 改成用 namepool 变成偏移可以 24 byte -> (usize + u16)10 byte
         + https://superuser.com/questions/1561484/what-is-the-maximum-length-of-a-filename-apfs
-        + NamePool 需要增加全局单例，且内部结构需要改造（改造成链表 + 内存块）（类似于 allocator）
+        + NamePool 需要增加全局单例(运行过程中不变，对去重有更高的要求了)，且内部结构需要改造（改造成链表 + 内存块）（类似于 allocator）
 + 为什么扫描 /Library/Developer/CoreSimulator/Volumes/iOS_23A343 是单线程的？
 + 考虑类LSM/WAL设计?
 + icon 抓取之后异步 push，有些icon取得挺慢的
 + 重启+reopen window之后会很慢
 + 一个全局 string池，生命周期类似于 allocator，
+    + 不适合用 allocator 形式，因为分配内存之后什么时候写入是不保证的
 
 ```bash
 npm run tauri dev -- --release --features dev
