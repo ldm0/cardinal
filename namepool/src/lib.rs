@@ -89,7 +89,6 @@ impl<const CAPACITY: usize> NamePool<CAPACITY> {
             .flat_map(|x| {
                 x.search_substr(substr)
                     .map(|s| unsafe { str::from_raw_parts(s.0, s.1) })
-                    .collect::<Vec<_>>()
             })
             .collect()
     }
