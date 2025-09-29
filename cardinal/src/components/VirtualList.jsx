@@ -9,7 +9,6 @@ import React, {
 	useImperativeHandle,
 	useMemo
 } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import Scrollbar from './Scrollbar';
 import { useDataLoader } from '../hooks/useDataLoader';
 
@@ -26,7 +25,6 @@ export const VirtualList = forwardRef(function VirtualList({
 }, ref) {
 	// ----- refs -----
 	const containerRef = useRef(null);
-	const viewportRef = useRef(null);
 	const lastScrollLeftRef = useRef(0);
 
 	// ----- state -----
@@ -157,7 +155,6 @@ export const VirtualList = forwardRef(function VirtualList({
 			aria-rowcount={rowCount}
 		>
 			<div
-				ref={viewportRef}
 				className="virtual-list-viewport"
 				onScroll={handleHorizontalScroll}
 			>
