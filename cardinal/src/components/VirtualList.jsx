@@ -94,17 +94,19 @@ export const VirtualList = forwardRef(function VirtualList({
 		return () => resizeObserver.disconnect();
 	}, []);
 
-	// 当参数变化时重新计算
+	// 当滚动范围变化时校正位置
 	useEffect(() => {
-		const clamped = Math.max(0, Math.min(scrollTop, maxScrollTop));
-		if (clamped !== scrollTop) setScrollTop(clamped);
-	}, [maxScrollTop, scrollTop]);
+		setScrollTop(prev => {
+			const clamped = Math.max(0, Math.min(prev, maxScrollTop));
+			return clamped === prev ? prev : clamped;
+		});
+	}, [maxScrollTop]);
 
 	// ----- imperative API -----
 	// 暴露的API
 	useImperativeHandle(ref, () => ({
 		scrollToTop: () => updateScrollAndRange(0),
-		ensureRangeLoaded: (from, to) => ensureRangeLoaded(from, to),
+		ensureRangeLoaded,
 	}), [updateScrollAndRange, ensureRangeLoaded]);
 
 	// ----- rendered items memo -----
