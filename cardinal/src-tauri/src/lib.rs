@@ -144,6 +144,7 @@ fn run_background_event_loop<F>(
     node_info_rx: Receiver<Vec<SlabIndex>>,
     node_info_results_tx: Sender<Vec<SearchResultNode>>,
     icon_viewport_rx: Receiver<(u64, Vec<SlabIndex>)>,
+    icon_update_tx: Sender<IconPayload>,
     watch_root: &str,
     fse_latency_secs: f64,
 ) where
@@ -186,7 +187,7 @@ fn run_background_event_loop<F>(
                     continue;
                 }
 
-                let handle = app_handle.clone();
+                let icon_update_tx = icon_update_tx.clone();
                 spawn(move || {
                     icon_jobs.into_iter().for_each(|(slab_index, path)| {
                         let icon = path
@@ -197,12 +198,7 @@ fn run_background_event_loop<F>(
                                 general_purpose::STANDARD.encode(&data)
                             ));
 
-                        if let Err(err) = handle.emit(
-                            "icon_update",
-                            IconPayload { slab_index, icon },
-                        ) {
-                            tracing::warn!("Failed to emit icon update: {}", err);
-                        }
+                        let _ = icon_update_tx.send(IconPayload { slab_index, icon });
                     });
                 });
             }
@@ -332,6 +328,7 @@ pub fn run() -> Result<()> {
     let (node_info_tx, node_info_rx) = unbounded();
     let (node_info_results_tx, node_info_results_rx) = unbounded::<Vec<SearchResultNode>>();
     let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>)>();
+    let (icon_update_tx, icon_update_rx) = unbounded::<IconPayload>();
 
     // 运行Tauri应用
     let app = tauri::Builder::default()
@@ -352,8 +349,21 @@ pub fn run() -> Result<()> {
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
-    let app_handle = app.handle().to_owned();
+    let app_handle = &app.handle().to_owned();
+    let icon_update_rx = &icon_update_rx;
     std::thread::scope(move |s| {
+        // Init icon update thread
+        s.spawn(|| {
+            while let Ok(icon) = icon_update_rx.recv() {
+                let mut icons = vec![icon];
+                // Batch icon updates within 100ms
+                std::thread::sleep(Duration::from_millis(100));
+                icons.extend(icon_update_rx.try_iter());
+                info!("emitting {} icons", icons.len());
+                app_handle.emit("icon_update", icons).unwrap();
+            }
+            info!("icon update thread exited");
+        });
         // Init background event processing thread
         s.spawn(move || {
             const WATCH_ROOT: &str = "/";
@@ -467,9 +477,11 @@ pub fn run() -> Result<()> {
                 node_info_rx,
                 node_info_results_tx,
                 icon_viewport_rx,
+                icon_update_tx,
                 WATCH_ROOT,
                 FSE_LATENCY_SECS,
             );
+
             info!("Background thread exited");
         });
 

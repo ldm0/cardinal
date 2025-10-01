@@ -31,17 +31,15 @@ export function useDataLoader(results) {
         (async () => {
             try {
                 unlistenIconUpdate = await listen('icon_update', (event) => {
-                    // console.log('Received icon_update event', event);
-                    const payload = event?.payload;
-                    if (!payload || typeof payload.slabIndex !== 'number') return;
-                    const { slabIndex, icon } = payload;
-                    const index = resultsRef.current.indexOf(slabIndex);
-                    if (index === -1) return;
+                    const updates = event?.payload;
                     setCache(prev => {
-                        const current = prev.get(index);
-                        if (current?.icon === icon) return prev;
                         const next = new Map(prev);
-                        next.set(index, current ? { ...current, icon } : { icon });
+                        updates.forEach(update => {
+                            const index = resultsRef.current.indexOf(update.slabIndex);
+                            if (index === -1) return;
+                            const current = next.get(index);
+                            next.set(index, current ? { ...current, icon: update.icon } : { icon: update.icon });
+                        });
                         cacheRef.current = next;
                         return next;
                     });
