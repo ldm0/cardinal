@@ -214,13 +214,25 @@ mod tests {
     #[test]
     fn test_scale_with_aspect_ratio() {
         // Scales down square
-        assert_eq!(scale_with_aspect_ratio(100.0, 100.0, 50.0, 50.0), (50.0, 50.0));
+        assert_eq!(
+            scale_with_aspect_ratio(100.0, 100.0, 50.0, 50.0),
+            (50.0, 50.0)
+        );
         // Scales up square
-        assert_eq!(scale_with_aspect_ratio(50.0, 50.0, 100.0, 100.0), (100.0, 100.0));
+        assert_eq!(
+            scale_with_aspect_ratio(50.0, 50.0, 100.0, 100.0),
+            (100.0, 100.0)
+        );
         // Wide scales down
-        assert_eq!(scale_with_aspect_ratio(200.0, 100.0, 50.0, 50.0), (50.0, 25.0));
+        assert_eq!(
+            scale_with_aspect_ratio(200.0, 100.0, 50.0, 50.0),
+            (50.0, 25.0)
+        );
         // Tall scales down
-        assert_eq!(scale_with_aspect_ratio(100.0, 200.0, 50.0, 50.0), (25.0, 50.0));
+        assert_eq!(
+            scale_with_aspect_ratio(100.0, 200.0, 50.0, 50.0),
+            (25.0, 50.0)
+        );
     }
 
     #[test]

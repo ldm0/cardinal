@@ -8,11 +8,11 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.69"
 bitflags = "2.9.0"
-# fsevent-sys = "4.1.0"
+# fsevent-sys = "5.1.0"
 fsevent-sys.git = "https://github.com/ldm0/fsevent-rust"
 chrono = "0.4.41"
-core-foundation = { version = "0.9.2", features = ["mac_os_10_8_features"] }
-dispatch2 = { version = "0.2.0", default-features = true, features = ["alloc"] }
+core-foundation = { version = "0.10.1", features = ["mac_os_10_8_features"] }
+dispatch2 = { version = "0.3.0", default-features = true, features = ["alloc"] }
 libc = "0.2.171"
 crossbeam-channel = "0.5"
 

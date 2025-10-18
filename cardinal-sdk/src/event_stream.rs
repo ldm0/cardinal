@@ -1,14 +1,13 @@
 use crate::FsEvent;
 use anyhow::{Result, bail};
-use core_foundation::{array::CFArray, base::TCFType, string::CFString};
+use core_foundation::{array::CFArray, base::TCFType, date::CFTimeInterval, string::CFString};
 use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
-use dispatch2::ffi::{DISPATCH_QUEUE_SERIAL, dispatch_queue_create, dispatch_release};
+use dispatch2::{DispatchQueue, DispatchQueueAttr, DispatchRetained};
 use fsevent_sys::{
     FSEventStreamContext, FSEventStreamCreate, FSEventStreamEventFlags, FSEventStreamEventId,
     FSEventStreamInvalidate, FSEventStreamRef, FSEventStreamRelease, FSEventStreamSetDispatchQueue,
-    FSEventStreamStart, FSEventStreamStop, core_foundation::CFTimeInterval,
-    kFSEventStreamCreateFlagFileEvents, kFSEventStreamCreateFlagNoDefer,
-    kFSEventStreamCreateFlagWatchRoot,
+    FSEventStreamStart, FSEventStreamStop, kFSEventStreamCreateFlagFileEvents,
+    kFSEventStreamCreateFlagNoDefer, kFSEventStreamCreateFlagWatchRoot,
 };
 use std::{ffi::c_void, ptr, slice};
 
@@ -33,7 +32,7 @@ impl EventStream {
         latency: CFTimeInterval,
         callback: EventsCallback,
     ) -> Self {
-        extern "C" fn drop_callback(info: *const c_void) {
+        extern "C" fn drop_callback(info: *mut c_void) {
             let _cb: Box<EventsCallback> = unsafe { Box::from_raw(info as _) };
         }
 
@@ -91,18 +90,13 @@ impl EventStream {
     }
 
     pub fn spawn(self) -> Result<EventStreamWithQueue> {
-        let queue =
-            unsafe { dispatch_queue_create(c"cardinal-sdk-queue".as_ptr(), DISPATCH_QUEUE_SERIAL) };
-        if queue.is_null() {
-            bail!("dispatch queue create failed.");
-        }
-        unsafe { FSEventStreamSetDispatchQueue(self.stream, queue) };
+        let queue = DispatchQueue::new("cardinal-sdk-queue", DispatchQueueAttr::SERIAL);
+        unsafe { FSEventStreamSetDispatchQueue(self.stream, &queue) };
         let result = unsafe { FSEventStreamStart(self.stream) };
         if result == 0 {
             // TODO(ldm0): RAII
             unsafe { FSEventStreamStop(self.stream) };
             unsafe { FSEventStreamInvalidate(self.stream) };
-            unsafe { dispatch_release(queue.cast()) };
             bail!("fs event stream start failed.");
         }
         let stream = self.stream;
@@ -116,7 +110,8 @@ impl EventStream {
 /// Dropping this struct will stop the FSEventStream and release the dispatch queue.
 pub struct EventStreamWithQueue {
     stream: FSEventStreamRef,
-    queue: dispatch2::ffi::dispatch_queue_t,
+    #[allow(dead_code)]
+    queue: DispatchRetained<DispatchQueue>,
 }
 
 impl Drop for EventStreamWithQueue {
@@ -125,7 +120,6 @@ impl Drop for EventStreamWithQueue {
             FSEventStreamStop(self.stream);
             FSEventStreamInvalidate(self.stream);
             FSEventStreamRelease(self.stream);
-            dispatch_release(self.queue.cast())
         }
     }
 }

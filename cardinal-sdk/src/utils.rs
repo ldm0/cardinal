@@ -42,7 +42,7 @@ pub fn last_event_id_before_time(dev: dev_t, timestamp: i64) -> u64 {
             event_id
         } else {
             let event_id =
-                unsafe { FSEventsGetLastEventIdForDeviceBeforeTime(dev, timestamp as f64) };
+                unsafe { FSEventsGetLastEventIdForDeviceBeforeTime(dev as _, timestamp as f64) };
             cache.insert(timestamp, event_id);
             event_id
         }
