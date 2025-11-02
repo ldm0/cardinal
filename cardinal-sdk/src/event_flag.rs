@@ -1,4 +1,3 @@
-#![allow(non_upper_case_globals)]
 use bitflags::bitflags;
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
