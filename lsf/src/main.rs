@@ -46,8 +46,8 @@ fn main() -> Result<()> {
     let (search_result_tx, search_result_rx) = unbounded::<Result<Vec<SearchResultNode>>>();
 
     std::thread::spawn(move || {
-        let mut event_watcher = EventWatcher::spawn("/".to_string(), cache.last_event_id(), 0.1);
-        println!("Processing changes during processing");
+        let (dev, mut event_watcher) = EventWatcher::spawn("/".to_string(), cache.last_event_id(), 0.1);
+        println!("Processing changes of dev:{dev} during preparation.");
         loop {
             crossbeam_channel::select! {
                 recv(finish_rx) -> tx => {
@@ -67,9 +67,12 @@ fn main() -> Result<()> {
                     if let Err(HandleFSEError::Rescan) = cache.handle_fs_events(events) {
                         println!("!!!!!!!!!! Rescan triggered !!!!!!!!");
                         // Here we clear event_watcher first as rescan may take a lot of time
-                        event_watcher.clear();
+                        #[allow(unused_assignments)]
+                        {
+                            event_watcher = EventWatcher::noop();
+                        }
                         cache.rescan();
-                        event_watcher = EventWatcher::spawn("/".to_string(), cache.last_event_id(), 0.1);
+                        event_watcher = EventWatcher::spawn("/".to_string(), cache.last_event_id(), 0.1).1;
                     }
                 }
             }

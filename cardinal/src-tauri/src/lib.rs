@@ -327,9 +327,9 @@ fn run_background_event_loop(
                 let handle_result = cache.handle_fs_events(events);
                 if let Err(HandleFSEError::Rescan) = handle_result {
                     info!("!!!!!!!!!! Rescan triggered !!!!!!!!");
-                    event_watcher.clear();
+                    event_watcher = EventWatcher::noop();
                     cache.rescan();
-                    event_watcher = EventWatcher::spawn(watch_root.to_string(), cache.last_event_id(), fse_latency_secs);
+                    event_watcher = EventWatcher::spawn(watch_root.to_string(), cache.last_event_id(), fse_latency_secs).1;
                     update_app_state(app_handle, AppLifecycleState::Initializing);
                     history_ready = false;
                 }
@@ -601,7 +601,7 @@ pub fn run() -> Result<()> {
                 WATCH_ROOT.to_string(),
                 cache.last_event_id(),
                 FSE_LATENCY_SECS,
-            );
+            ).1;
             if !matches!(load_app_state(), AppLifecycleState::Ready) {
                 update_app_state(app_handle, AppLifecycleState::Initializing);
             }

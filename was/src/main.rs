@@ -1,4 +1,4 @@
-use cardinal_sdk::{EventFlag, EventWatcher, dev_of_path, event_id_to_timestamp};
+use cardinal_sdk::{EventFlag, EventWatcher, event_id_to_timestamp};
 use clap::Parser;
 use std::time::Duration;
 
@@ -19,9 +19,9 @@ fn main() {
             .to_string_lossy()
             .to_string()
     });
-    let event_stream = EventWatcher::spawn(path, cli.since, 0.1);
+    let (dev, event_stream) = EventWatcher::spawn(path, cli.since, 0.1);
+    let cache = &mut std::collections::HashMap::new();
     let mut history_done = false;
-    let dev = dev_of_path(c"/").unwrap();
     let timezone = chrono::Local::now().timezone();
     loop {
         let events = if history_done {
@@ -40,7 +40,7 @@ fn main() {
             if event.flag.contains(EventFlag::HistoryDone) {
                 history_done = true;
             }
-            let timestamp = event_id_to_timestamp(dev, event.id);
+            let timestamp = event_id_to_timestamp(dev, event.id, cache);
             let time = chrono::DateTime::from_timestamp(timestamp, 0)
                 .unwrap()
                 .with_timezone(&timezone);

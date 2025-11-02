@@ -2,25 +2,24 @@ use crate::FsEvent;
 use anyhow::{Result, bail};
 use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
 use dispatch2::{DispatchQueue, DispatchQueueAttr, DispatchRetained};
+use libc::dev_t;
 use objc2_core_foundation::{CFArray, CFString, CFTimeInterval};
 use objc2_core_services::{
     ConstFSEventStreamRef, FSEventStreamContext, FSEventStreamCreate, FSEventStreamEventFlags,
-    FSEventStreamEventId, FSEventStreamInvalidate, FSEventStreamRef, FSEventStreamRelease,
-    FSEventStreamSetDispatchQueue, FSEventStreamStart, FSEventStreamStop,
-    kFSEventStreamCreateFlagFileEvents, kFSEventStreamCreateFlagNoDefer,
+    FSEventStreamEventId, FSEventStreamGetDeviceBeingWatched, FSEventStreamInvalidate,
+    FSEventStreamRef, FSEventStreamRelease, FSEventStreamSetDispatchQueue, FSEventStreamStart,
+    FSEventStreamStop, kFSEventStreamCreateFlagFileEvents, kFSEventStreamCreateFlagNoDefer,
     kFSEventStreamCreateFlagWatchRoot,
 };
-use std::{
-    ffi::c_void,
-    ptr::NonNull,
-    slice,
-};
+use std::{ffi::c_void, ptr::NonNull, slice};
 
 type EventsCallback = Box<dyn FnMut(Vec<FsEvent>) + Send>;
 
 pub struct EventStream {
     stream: FSEventStreamRef,
 }
+
+unsafe impl Send for EventStream {}
 
 impl Drop for EventStream {
     fn drop(&mut self) {
@@ -91,19 +90,23 @@ impl EventStream {
         Self { stream }
     }
 
+    // Start the FSEventStream with a dispatch queue.
     pub fn spawn(self) -> Result<EventStreamWithQueue> {
         let queue = DispatchQueue::new("cardinal-sdk-queue", DispatchQueueAttr::SERIAL);
         unsafe { FSEventStreamSetDispatchQueue(self.stream, Some(&queue)) };
         let result = unsafe { FSEventStreamStart(self.stream) };
         if !result {
-            // TODO(ldm0): RAII
             unsafe { FSEventStreamStop(self.stream) };
             unsafe { FSEventStreamInvalidate(self.stream) };
             bail!("fs event stream start failed.");
         }
         let stream = self.stream;
-        std::mem::forget(self);
         Ok(EventStreamWithQueue { stream, queue })
+    }
+
+    // Get device id being watched by this event stream.
+    pub fn dev(&self) -> dev_t {
+        unsafe { FSEventStreamGetDeviceBeingWatched(self.stream.cast_const()) }
     }
 }
 
@@ -139,29 +142,35 @@ impl EventWatcher {
         }
     }
 
-    pub fn clear(&mut self) {
-        let _ = std::mem::replace(self, Self::noop());
-    }
-
-    pub fn spawn(path: String, since_event_id: FSEventStreamEventId, latency: f64) -> EventWatcher {
+    pub fn spawn(
+        path: String,
+        since_event_id: FSEventStreamEventId,
+        latency: f64,
+    ) -> (dev_t, EventWatcher) {
         let (_cancellation_token, cancellation_token_rx) = bounded::<()>(1);
         let (sender, receiver) = unbounded();
-        std::thread::spawn(move || {
-            let _stream_and_queue = EventStream::new(
-                &[&path],
-                since_event_id,
-                latency,
-                Box::new(move |events| {
-                    let _ = sender.send(events);
-                }),
-            )
-            .spawn()
+        let stream = EventStream::new(
+            &[&path],
+            since_event_id,
+            latency,
+            Box::new(move |events| {
+                let _ = sender.send(events);
+            }),
+        );
+        let dev = stream.dev();
+        std::thread::Builder::new()
+            .name("cardinal-sdk-event-watcher".to_string())
+            .spawn(move || {
+                let _stream_and_queue = stream.spawn().expect("failed to spawn event stream");
+                let _ = cancellation_token_rx.recv();
+            })
             .unwrap();
-            let _ = cancellation_token_rx.recv();
-        });
-        EventWatcher {
-            receiver,
-            _cancellation_token,
-        }
+        (
+            dev,
+            EventWatcher {
+                receiver,
+                _cancellation_token,
+            },
+        )
     }
 }
