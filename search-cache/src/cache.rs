@@ -1,5 +1,5 @@
 use crate::{
-    SearchResultNode, SlabIndex, SlabNode, SlabNodeMetadataCompact, State, ThinSlab,
+    NameIndex, SearchResultNode, SlabIndex, SlabNode, SlabNodeMetadataCompact, State, ThinSlab,
     persistent::{PersistentStorage, read_cache_from_file, write_cache_to_file},
 };
 use anyhow::{Context, Result, anyhow, bail};
@@ -10,7 +10,7 @@ use namepool::NamePool;
 use query_segmentation::{Segment, query_segmentation};
 use regex::{Regex, RegexBuilder};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     ffi::OsStr,
     io::ErrorKind,
     path::{Path, PathBuf},
@@ -26,7 +26,7 @@ pub struct SearchCache {
     last_event_id: u64,
     slab_root: SlabIndex,
     slab: ThinSlab<SlabNode>,
-    name_index: BTreeMap<&'static str, HashSet<SlabIndex>>,
+    name_index: NameIndex,
     ignore_path: Option<&'static Path>,
     cancel: Option<&'static AtomicBool>,
 }
@@ -159,7 +159,7 @@ impl SearchCache {
                      last_event_id,
                  }| {
                     // name pool construction speed is fast enough that caching it doesn't worth it.
-                    let name_index = name_pool(name_index);
+                    let name_index = NameIndex::construct_name_pool(name_index);
                     Self::new(
                         path,
                         last_event_id,
@@ -228,26 +228,9 @@ impl SearchCache {
 
             Some((slab_root, slab))
         }
-        fn name_index(slab: &ThinSlab<SlabNode>) -> BTreeMap<&'static str, HashSet<SlabIndex>> {
-            fn construct_name_index(
-                slab: &ThinSlab<SlabNode>,
-                name_index: &mut BTreeMap<&'static str, HashSet<SlabIndex>>,
-            ) {
-                // The slab is newly constructed, thus though slab.iter() iterates all slots, it won't waste too much.
-                slab.iter().for_each(|(i, node)| {
-                    if let Some(nodes) = name_index.get_mut(node.name_and_parent.as_str()) {
-                        nodes.insert(i);
-                    } else {
-                        let mut nodes = HashSet::with_capacity(1);
-                        nodes.insert(i);
-                        name_index.insert(node.name_and_parent.as_str(), nodes);
-                    };
-                });
-            }
-
+        fn construct_name_index(slab: &ThinSlab<SlabNode>) -> NameIndex {
             let name_index_time = Instant::now();
-            let mut name_index = BTreeMap::default();
-            construct_name_index(slab, &mut name_index);
+            let name_index = NameIndex::from_slab(slab);
             info!(
                 "Name index construction time: {:?}, len: {}",
                 name_index_time.elapsed(),
@@ -258,7 +241,7 @@ impl SearchCache {
 
         let last_event_id = current_event_id();
         let (slab_root, slab) = walkfs_to_slab(&path, walk_data)?;
-        let name_index = name_index(&slab);
+        let name_index = construct_name_index(&slab);
         // metadata cache inits later
         Some(Self::new(
             path,
@@ -276,7 +259,7 @@ impl SearchCache {
         last_event_id: u64,
         slab_root: SlabIndex,
         slab: ThinSlab<SlabNode>,
-        name_index: BTreeMap<&'static str, HashSet<SlabIndex>>,
+        name_index: NameIndex,
         ignore_path: Option<&'static Path>,
         cancel: Option<&'static AtomicBool>,
     ) -> Self {
@@ -292,7 +275,7 @@ impl SearchCache {
     }
 
     pub fn search_empty(&self) -> Vec<SlabIndex> {
-        self.name_index.values().flatten().copied().collect()
+        self.name_index.all_indices()
     }
 
     pub fn search(&self, line: &str) -> Result<Vec<SlabIndex>> {
@@ -421,14 +404,7 @@ impl SearchCache {
     fn push_node(&mut self, node: SlabNode) -> SlabIndex {
         let node_name = node.name_and_parent;
         let index = self.slab.insert(node);
-        if let Some(indexes) = self.name_index.get_mut(&*node_name) {
-            indexes.insert(index);
-        } else {
-            let mut indices = HashSet::with_capacity(1);
-            indices.insert(index);
-            let node_name = NAME_POOL.push(&node_name);
-            self.name_index.insert(node_name, indices);
-        }
+        self.name_index.add_index(node_name.as_str(), index);
         index
     }
 
@@ -553,17 +529,10 @@ impl SearchCache {
     fn remove_node(&mut self, index: SlabIndex) {
         fn remove_single_node(cache: &mut SearchCache, index: SlabIndex) {
             if let Some(node) = cache.slab.try_remove(index) {
-                let indexes = cache
+                let removed = cache
                     .name_index
-                    .get_mut(node.name_and_parent.as_str())
-                    .expect("inconsistent name index and node");
-                indexes.remove(&index);
-                if indexes.is_empty() {
-                    cache.name_index.remove(node.name_and_parent.as_str());
-                    // TODO(ldm0): actually we need to remove name in the name pool,
-                    // but currently name pool doesn't support remove. (GC is needed for name pool)
-                    // self.name_pool.remove(&node.name);
-                }
+                    .remove_index(node.name_and_parent.as_str(), index);
+                assert!(removed, "inconsistent name index and node");
             }
         }
 
@@ -588,10 +557,7 @@ impl SearchCache {
             ignore_path: _,
             cancel: _,
         } = self;
-        let name_index = name_index
-            .into_iter()
-            .map(|(k, v)| (k.to_string().into_boxed_str(), v))
-            .collect();
+        let name_index = name_index.into_persistent();
         write_cache_to_file(
             cache_path,
             PersistentStorage {
@@ -853,23 +819,6 @@ impl SearchCache {
 }
 
 pub static NAME_POOL: LazyLock<NamePool> = LazyLock::new(NamePool::new);
-
-fn name_pool(
-    name_index: BTreeMap<Box<str>, HashSet<SlabIndex>>,
-) -> BTreeMap<&'static str, HashSet<SlabIndex>> {
-    let name_pool_time = Instant::now();
-    let mut new_name_index = BTreeMap::new();
-    for (name, indices) in name_index {
-        let name: &'static str = NAME_POOL.push(&name);
-        new_name_index.insert(name, indices);
-    }
-    info!(
-        "Name pool construction time: {:?}, count: {}",
-        name_pool_time.elapsed(),
-        NAME_POOL.len(),
-    );
-    new_name_index
-}
 
 #[cfg(test)]
 mod tests {
