@@ -1,12 +1,15 @@
-<div>
-  <img width="100" height="100" align="left" src="cardinal/mac-icon_1024x1024.png" alt="Cardinal Icon"/>
-  <br>
-  <p><strong>Cardinal</strong> is a fast file searching app for macOS.</p>
+<div align="center">
+  <img src="cardinal/mac-icon_1024x1024.png" alt="Cardinal icon" width="120" height="120">
+  <h1>Cardinal</h1>
+  <p>Lightning-fast file search for macOS with live previews and fuzzy matching.</p>
+  <p>
+    <a href="#requirements">Requirements</a> ·
+    <a href="#running-cardinal">Running Cardinal</a> ·
+    <a href="#testing--quality">Testing &amp; Quality</a> ·
+    <a href="#contributing">Contributing</a>
+  </p>
+  <img src="doc/UI.gif" alt="Cardinal UI preview" width="720">
 </div>
-
-<p align="center">
-  <img src="doc/UI.gif" alt="Cardinal UI">
-</p>
 
 ---
 
