@@ -469,7 +469,9 @@ pub fn run() -> Result<()> {
     {
         builder = builder.plugin(tauri_plugin_prevent_default::init());
     }
-    builder = builder.plugin(tauri_plugin_opener::init());
+    builder = builder
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_window_state::Builder::new().build());
     // Run the Tauri application.
     let app = builder
         .manage(SearchState {
@@ -604,7 +606,8 @@ pub fn run() -> Result<()> {
                 WATCH_ROOT.to_string(),
                 cache.last_event_id(),
                 FSE_LATENCY_SECS,
-            ).1;
+            )
+            .1;
             if !matches!(load_app_state(), AppLifecycleState::Ready) {
                 update_app_state(app_handle, AppLifecycleState::Initializing);
             }
