@@ -1,7 +1,7 @@
 <div align="center">
   <img src="cardinal/mac-icon_1024x1024.png" alt="Cardinal icon" width="120" height="120">
   <h1>Cardinal</h1>
-  <p>Lightning-fast file search for macOS with live previews and fuzzy matching.</p>
+  <p>A fast file searching tool for macOS.</p>
   <p>
     <a href="#requirements">Requirements</a> ·
     <a href="#running-cardinal">Running Cardinal</a> ·
