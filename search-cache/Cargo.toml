@@ -13,7 +13,9 @@ serde = { version = "1", features = ["derive"] }
 slab = { version = "0.4", features = ["serde"] }
 anyhow = "1.0.97"
 crossbeam-channel = "0.5.15"
-typed-num = { version = "0.3.0", default-features = false, features = ["serde"] }
+typed-num = { version = "0.3.0", default-features = false, features = [
+  "serde",
+] }
 tracing = "0.1"
 postcard = { version = "1", features = ["use-std"] }
 enumn = "0.1"

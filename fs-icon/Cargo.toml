@@ -6,9 +6,27 @@ edition = "2024"
 [dependencies]
 block2 = "0.6.1"
 objc2 = "0.6.2"
-objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSImage", "NSBitmapImageRep", "block2"] }
-objc2-foundation = { version = "0.3", features = ["NSString", "NSData", "NSDictionary", "NSURL", "NSError"] }
-objc2-quick-look-thumbnailing = { version = "0.3", features = ["QLThumbnailGenerator", "QLThumbnailRepresentation"] }
+objc2-app-kit = { version = "0.3", features = [
+  "NSWorkspace",
+  "NSImage",
+  "NSBitmapImageRep",
+  "block2",
+] }
+objc2-foundation = { version = "0.3", features = [
+  "NSString",
+  "NSData",
+  "NSDictionary",
+  "NSURL",
+  "NSError",
+] }
+objc2-quick-look-thumbnailing = { version = "0.3", features = [
+  "QLThumbnailGenerator",
+  "QLThumbnailRepresentation",
+] }
 objc2-image-io = { version = "0.3", features = ["CGImageSource"] }
-objc2-core-foundation = { version = "0.3", features = ["CFURL", "CFDictionary", "CFNumber"] }
+objc2-core-foundation = { version = "0.3", features = [
+  "CFURL",
+  "CFDictionary",
+  "CFNumber",
+] }
 crossbeam-channel = "0.5.0"

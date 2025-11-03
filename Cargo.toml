@@ -1,12 +1,12 @@
 [workspace]
 resolver = "3"
 members = [
-    "lsf",
-    "cardinal-sdk",
-    "fswalk",
-    "namepool",
-    "was",
-    "fs-icon",
-    "query-segmentation",
+  "lsf",
+  "cardinal-sdk",
+  "fswalk",
+  "namepool",
+  "was",
+  "fs-icon",
+  "query-segmentation",
 ]
 exclude = ["cardinal"]

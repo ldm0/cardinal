@@ -1,0 +1,33 @@
+name: CI
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    name: Check format
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v5
+    - run: cargo fmt --all -- --check
+
+  taplo:
+    name: Taplo (toml format)
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v5
+    - uses: taiki-e/install-action@v2
+      with:
+          tool: taplo-cli
+    - run: taplo fmt --check
+
+  test:
+    name: Run all tests
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v5
+    - run: cargo test --workspace

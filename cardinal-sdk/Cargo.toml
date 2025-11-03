@@ -8,16 +8,16 @@ edition = "2024"
 [dependencies]
 bitflags = "2.9.0"
 objc2-core-foundation = { version = "0.3.2", default-features = false, features = [
-    "std",
-    "CFString",
-    "CFRunLoop",
-    "CFArray",
+  "std",
+  "CFString",
+  "CFRunLoop",
+  "CFArray",
 ] }
 objc2-core-services = { version = "0.3.2", default-features = false, features = [
-    "std",
-    "FSEvents",
-    "dispatch2",
-    "libc",
+  "std",
+  "FSEvents",
+  "dispatch2",
+  "libc",
 ] }
 dispatch2 = { version = "0.3.0", default-features = true, features = ["alloc"] }
 libc = "0.2.171"
