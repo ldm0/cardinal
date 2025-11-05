@@ -36,7 +36,11 @@ export function StateDisplay({
 
   if (state === 'error') {
     return (
-      <State icon={<div className="error-icon">!</div>} title={t('stateDisplay.error')} message={message} />
+      <State
+        icon={<div className="error-icon">!</div>}
+        title={t('stateDisplay.error')}
+        message={message}
+      />
     );
   }
 
@@ -60,13 +64,7 @@ export function StateDisplay({
       </svg>
     );
     const emptyTitle = t('stateDisplay.emptyTitle', { query: query ?? '' });
-    return (
-      <State
-        icon={icon}
-        title={emptyTitle}
-        message={t('stateDisplay.emptyMessage')}
-      />
-    );
+    return <State icon={icon} title={emptyTitle} message={t('stateDisplay.emptyMessage')} />;
   }
 
   return null;
