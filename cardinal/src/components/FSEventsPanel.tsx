@@ -6,13 +6,11 @@ import React, {
   useImperativeHandle,
   forwardRef,
   useMemo,
+  useLayoutEffect,
+  useState,
 } from 'react';
-import AutoSizer from 'react-virtualized-auto-sizer';
-import { FixedSizeList } from 'react-window';
-import type {
-  FixedSizeList as FixedSizeListType,
-  ListChildComponentProps,
-} from 'react-window';
+import { List } from 'react-window';
+import type { ListImperativeAPI, RowComponentProps } from 'react-window';
 import { ROW_HEIGHT } from '../constants';
 import { MiddleEllipsisHighlight } from './MiddleEllipsisHighlight';
 import { formatTimestamp } from '../utils/format';
@@ -31,40 +29,14 @@ const BOTTOM_THRESHOLD = 50;
 
 export type FileSystemEvent = RecentEventPayload;
 
-type EventListItemData = {
+type EventRowContext = {
   events: FileSystemEvent[];
   onContextMenu?: (event: React.MouseEvent<HTMLDivElement>, path: string) => void;
   searchQuery: string;
   caseInsensitive: boolean;
 };
 
-const EventsInnerElement = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ style, className, ...rest }, ref) => {
-    return (
-      <div
-        {...rest}
-        ref={ref}
-        className={className ? `${className} events-list-inner` : 'events-list-inner'}
-        style={{
-          ...style,
-          width: 'var(--columns-events-total)',
-          minWidth: 'var(--columns-events-total)',
-        }}
-      />
-    );
-  },
-);
-
-EventsInnerElement.displayName = 'EventsInnerElement';
-
-type EventRowProps = {
-  item: FileSystemEvent | undefined;
-  rowIndex: number;
-  style: React.CSSProperties;
-  onContextMenu?: (event: React.MouseEvent<HTMLDivElement>, path: string) => void;
-  searchQuery: string;
-  caseInsensitive: boolean;
-};
+type EventRowProps = RowComponentProps<EventRowContext>;
 
 const splitPath = (path: string | undefined): { name: string; directory: string } => {
   if (!path) {
@@ -84,13 +56,15 @@ const splitPath = (path: string | undefined): { name: string; directory: string 
 };
 
 const EventRow = memo(function EventRow({
-  item: event,
-  rowIndex,
+  index,
   style,
+  events,
   onContextMenu,
   searchQuery,
   caseInsensitive,
+  ariaAttributes,
 }: EventRowProps): React.JSX.Element {
+  const event = events[index];
   const pathSource = event?.path ?? '';
   const { name, directory } = splitPath(pathSource);
   const timestamp = typeof event?.timestamp === 'number' ? event.timestamp : undefined;
@@ -107,8 +81,9 @@ const EventRow = memo(function EventRow({
 
   return (
     <div
-      style={style}
-      className={`row columns-events ${rowIndex % 2 === 0 ? 'row-even' : 'row-odd'}`}
+      {...ariaAttributes}
+      style={{ ...style, width: 'var(--columns-events-total)' }}
+      className={`row columns-events ${index % 2 === 0 ? 'row-even' : 'row-odd'}`}
       title={pathSource}
       onContextMenu={handleContextMenu}
     >
@@ -151,10 +126,13 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
     ref,
   ) => {
     const headerRef = useRef<HTMLDivElement | null>(null);
-    const listRef = useRef<FixedSizeListType<EventListItemData> | null>(null);
+    const listRef = useRef<ListImperativeAPI | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    const listContainerRef = useRef<HTMLDivElement | null>(null);
+    const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
     const isAtBottomRef = useRef(true); // Track whether the viewport is watching the newest events.
     const prevEventsLengthRef = useRef(events.length);
+
     const restoreHorizontalScroll = useCallback((scrollLeft: number) => {
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollLeft = scrollLeft;
@@ -176,23 +154,6 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
       isAtBottomRef.current = distanceFromBottom <= BOTTOM_THRESHOLD;
     }, []);
 
-    const setOuterRef = useCallback(
-      (node: HTMLDivElement | null) => {
-        const previous = scrollContainerRef.current;
-        if (previous) {
-          previous.removeEventListener('scroll', syncScrollState);
-        }
-
-        scrollContainerRef.current = node;
-
-        if (node) {
-          node.addEventListener('scroll', syncScrollState);
-          syncScrollState();
-        }
-      },
-      [syncScrollState],
-    );
-
     // Allow the parent (App) to imperatively jump to the latest event after tab switches.
     useImperativeHandle(
       ref,
@@ -202,7 +163,7 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
           if (!list || events.length === 0) return;
 
           const previousScrollLeft = scrollContainerRef.current?.scrollLeft ?? 0;
-          list.scrollToItem(events.length - 1, 'end');
+          list.scrollToRow({ index: events.length - 1, align: 'end' });
           requestAnimationFrame(() => {
             restoreHorizontalScroll(previousScrollLeft);
           });
@@ -212,7 +173,7 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
       [events.length, restoreHorizontalScroll],
     );
 
-    const itemData = useMemo<EventListItemData>(
+    const rowProps = useMemo<EventRowContext>(
       () => ({
         events,
         onContextMenu,
@@ -220,31 +181,6 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
         caseInsensitive,
       }),
       [events, onContextMenu, searchQuery, caseInsensitive],
-    );
-
-    const renderRow = useCallback(
-      ({ index, style, data }: ListChildComponentProps<EventListItemData>) => {
-        const event = data.events[index];
-        return (
-          <EventRow
-            item={event}
-            rowIndex={index}
-            style={{ ...style, width: 'var(--columns-events-total)' }}
-            onContextMenu={data.onContextMenu}
-            searchQuery={data.searchQuery}
-            caseInsensitive={data.caseInsensitive}
-          />
-        );
-      },
-      [],
-    );
-
-    const itemKey = useCallback(
-      (index: number, data: EventListItemData) => {
-        const event = data.events[index];
-        return event?.eventId ?? index;
-      },
-      [],
     );
 
     // Keep appending events visible when the user is already watching the feed tail.
@@ -257,13 +193,61 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
         const list = listRef.current;
         if (list && currentLength > 0) {
           const previousScrollLeft = scrollContainerRef.current?.scrollLeft ?? 0;
-          list.scrollToItem(currentLength - 1, 'end');
+          list.scrollToRow({ index: currentLength - 1, align: 'end' });
           requestAnimationFrame(() => {
             restoreHorizontalScroll(previousScrollLeft);
           });
         }
       }
     }, [events.length, restoreHorizontalScroll]);
+
+    const attachScrollContainer = useCallback(
+      (instance: ListImperativeAPI | null) => {
+        const previous = scrollContainerRef.current;
+        if (previous) {
+          previous.removeEventListener('scroll', syncScrollState);
+          scrollContainerRef.current = null;
+        }
+
+        listRef.current = instance;
+
+        const node = instance?.element ?? null;
+        if (node) {
+          scrollContainerRef.current = node;
+          node.addEventListener('scroll', syncScrollState);
+          syncScrollState();
+        }
+      },
+      [syncScrollState],
+    );
+
+    useLayoutEffect(() => {
+      const node = listContainerRef.current;
+      if (!node || typeof ResizeObserver === 'undefined') {
+        return;
+      }
+
+      const updateSize = (width: number, height: number) => {
+        setContainerSize((prev) =>
+          prev.width === width && prev.height === height ? prev : { width, height },
+        );
+      };
+
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const { width, height } = entry.contentRect;
+          updateSize(width, height);
+        }
+      });
+
+      observer.observe(node);
+      const rect = node.getBoundingClientRect();
+      updateSize(rect.width, rect.height);
+
+      return () => {
+        observer.disconnect();
+      };
+    }, []);
 
     useEffect(() => {
       return () => {
@@ -298,25 +282,21 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
               <p className="events-empty__hint">Keep working and check back for updates.</p>
             </div>
           ) : (
-            <AutoSizer>
-              {({ width, height }: { width: number; height: number }) => (
-                <FixedSizeList
-                  ref={listRef}
-                  width={width}
-                  height={height}
-                  itemCount={events.length}
-                  itemSize={ROW_HEIGHT}
-                  itemData={itemData}
-                  itemKey={itemKey}
+            <div className="events-list-container" ref={listContainerRef}>
+              {containerSize.width > 0 && containerSize.height > 0 && (
+                <List
+                  listRef={attachScrollContainer}
+                  rowComponent={EventRow}
+                  rowCount={events.length}
+                  rowHeight={ROW_HEIGHT}
+                  rowProps={rowProps}
                   className="events-list"
-                  outerRef={setOuterRef}
-                  innerElementType={EventsInnerElement}
+                  style={{ width: containerSize.width, height: containerSize.height }}
+                  defaultHeight={containerSize.height}
                   overscanCount={10}
-                >
-                  {renderRow}
-                </FixedSizeList>
+                />
               )}
-            </AutoSizer>
+            </div>
           )}
         </div>
       </div>

@@ -290,10 +290,20 @@ button:active {
   padding: 0 0 0 var(--container-padding);
 }
 
+.events-list-container {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+}
+
 /* Virtualized events list container */
 .events-list {
   outline: none !important;
   overflow: auto !important;
+  width: 100%;
+  height: 100%;
 }
 
 .events-list-inner {
