@@ -1,6 +1,8 @@
 import React, { useCallback, useRef, useLayoutEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { AppLifecycleStatus } from '../types/ipc';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from './LanguageSwitcher';
 
 export type StatusTabKey = 'files' | 'events';
 
@@ -15,17 +17,13 @@ type StatusBarProps = {
   onRequestRescan?: () => void;
 };
 
-const TABS: Array<{ key: StatusTabKey; label: string }> = [
-  { key: 'files', label: 'Files' },
-  { key: 'events', label: 'Events' },
-];
+const TABS: StatusTabKey[] = ['files', 'events'];
 
-const LIFECYCLE_DISPLAY: Record<AppLifecycleStatus, { icon: string; label: string; tone: string }> =
-  {
-    Initializing: { icon: '○', label: 'Initializing', tone: 'initializing' },
-    Ready: { icon: '●', label: 'Ready', tone: 'ready' },
-    Closing: { icon: '●', label: 'Closing', tone: 'closing' },
-  };
+const LIFECYCLE_META: Record<AppLifecycleStatus, { icon: string; tone: string }> = {
+  Initializing: { icon: '○', tone: 'initializing' },
+  Ready: { icon: '●', tone: 'ready' },
+  Closing: { icon: '●', tone: 'closing' },
+};
 
 const StatusBar = ({
   scannedFiles,
@@ -37,6 +35,7 @@ const StatusBar = ({
   onTabChange,
   onRequestRescan,
 }: StatusBarProps): React.JSX.Element => {
+  const { t } = useTranslation();
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const filesTabRef = useRef<HTMLButtonElement | null>(null);
   const eventsTabRef = useRef<HTMLButtonElement | null>(null);
@@ -71,18 +70,30 @@ const StatusBar = ({
     [activeTab, onTabChange],
   );
 
+  const formattedResultCount =
+    typeof resultCount === 'number' ? resultCount.toLocaleString() : null;
   const resultsText =
     typeof resultCount === 'number'
-      ? `${resultCount.toLocaleString()} result${resultCount === 1 ? '' : 's'}`
-      : '—';
+      ? t('statusBar.resultsCount', {
+          count: resultCount,
+          formatted: formattedResultCount ?? `${resultCount}`,
+        })
+      : t('statusBar.resultsUnavailable');
+  const formattedDuration =
+    typeof searchDurationMs === 'number' ? Math.round(searchDurationMs).toLocaleString() : null;
   const durationText =
-    typeof searchDurationMs === 'number' ? `${Math.round(searchDurationMs)}ms` : null;
-  const searchDisplay = durationText ? `${resultsText} • ${durationText}` : resultsText;
-  const lifecycle = LIFECYCLE_DISPLAY[lifecycleState] ?? LIFECYCLE_DISPLAY.Initializing;
+    formattedDuration != null ? t('statusBar.duration', { value: formattedDuration }) : null;
+  const searchDisplay = durationText
+    ? t('statusBar.resultsWithDuration', { results: resultsText, duration: durationText })
+    : resultsText;
+  const lifecycleMeta = LIFECYCLE_META[lifecycleState] ?? LIFECYCLE_META.Initializing;
+  const lifecycleLabel =
+    t(`statusBar.lifecycle.${lifecycleState}`) ?? t('statusBar.lifecycle.Initializing');
   const rescanDisabled = lifecycleState !== 'Ready';
   const rescanTitle = rescanDisabled
-    ? 'Rescan becomes available once Cardinal finishes initializing.'
-    : 'Trigger a full filesystem rescan.';
+    ? t('statusBar.rescan.disabledHint')
+    : t('statusBar.rescan.enabledHint');
+  const indicatorLabel = t('statusBar.aria.status', { status: lifecycleLabel });
 
   const handleRescanClick = useCallback(() => {
     if (rescanDisabled) {
@@ -96,18 +107,24 @@ const StatusBar = ({
       <div className="status-left">
         <div className="status-section">
           <span
-            className={`readiness-indicator ${lifecycle.tone}`}
-            aria-label={`Application status: ${lifecycle.label}`}
-            title={`Application status: ${lifecycle.label}`}
+            className={`readiness-indicator ${lifecycleMeta.tone}`}
+            aria-label={indicatorLabel}
+            title={indicatorLabel}
           >
-            {lifecycle.icon}
+            {lifecycleMeta.icon}
           </span>
-          <span className="status-text">{lifecycle.label}</span>
+          <span className="status-text">{lifecycleLabel}</span>
         </div>
-        <div ref={tabsRef} className="status-tabs" role="tablist" aria-label="Search status view">
+        <div
+          ref={tabsRef}
+          className="status-tabs"
+          role="tablist"
+          aria-label={t('statusBar.aria.tablist')}
+        >
           <div className="status-tabs-slider" style={sliderStyle} />
-          {TABS.map(({ key, label }) => {
+          {TABS.map((key) => {
             const isActive = activeTab === key;
+            const label = t(`statusBar.tabs.${key}`);
             const value =
               key === 'files' ? scannedFiles.toLocaleString() : processedEvents.toLocaleString();
             const ref = key === 'files' ? filesTabRef : eventsTabRef;
@@ -128,25 +145,28 @@ const StatusBar = ({
             );
           })}
         </div>
-        <button
-          type="button"
-          className="status-rescan-button"
-          onClick={handleRescanClick}
-          disabled={rescanDisabled}
-          title={rescanTitle}
-          aria-label="Trigger filesystem rescan"
-        >
-          <span className="status-rescan-icon" aria-hidden="true">
-            ↻
-          </span>
-          <span className="sr-only">Trigger filesystem rescan</span>
-        </button>
+        <div className="status-controls">
+          <button
+            type="button"
+            className="status-icon-button status-rescan-button"
+            onClick={handleRescanClick}
+            disabled={rescanDisabled}
+            title={rescanTitle}
+            aria-label={t('statusBar.aria.rescan')}
+          >
+            <span className="status-rescan-icon" aria-hidden="true">
+              ↻
+            </span>
+            <span className="sr-only">{t('statusBar.aria.rescan')}</span>
+          </button>
+          <LanguageSwitcher className="status-icon-button status-language-switcher" />
+        </div>
       </div>
 
       <div className="status-right">
         <div className="status-section">
-          <span className="status-label">Search:</span>
-          <span className="status-value" title="Results • Duration">
+          <span className="status-label">{t('statusBar.searchLabel')}</span>
+          <span className="status-value" title={t('statusBar.resultsTitle')}>
             {searchDisplay}
           </span>
         </div>

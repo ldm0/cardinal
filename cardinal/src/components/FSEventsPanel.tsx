@@ -15,11 +15,12 @@ import { ROW_HEIGHT } from '../constants';
 import { MiddleEllipsisHighlight } from './MiddleEllipsisHighlight';
 import { formatTimestamp } from '../utils/format';
 import type { RecentEventPayload } from '../types/ipc';
+import { useTranslation } from 'react-i18next';
 
 const COLUMNS = [
-  { key: 'time', label: 'Time' },
-  { key: 'name', label: 'Filename' },
-  { key: 'path', label: 'Path' },
+  { key: 'time', labelKey: 'events.columns.time' },
+  { key: 'name', labelKey: 'events.columns.name' },
+  { key: 'path', labelKey: 'events.columns.path' },
 ] as const;
 
 type EventColumnKey = (typeof COLUMNS)[number]['key'];
@@ -125,6 +126,7 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
     { events, onResizeStart, onContextMenu, onHeaderContextMenu, searchQuery, caseInsensitive },
     ref,
   ) => {
+    const { t } = useTranslation();
     const headerRef = useRef<HTMLDivElement | null>(null);
     const listRef = useRef<ListImperativeAPI | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -257,9 +259,9 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
       <div className="events-panel-wrapper">
         <div ref={headerRef} className="header-row-container">
           <div className="header-row columns-events" onContextMenu={onHeaderContextMenu}>
-            {COLUMNS.map(({ key, label }) => (
+            {COLUMNS.map(({ key, labelKey }) => (
               <span key={key} className={`event-${key}-header header header-cell`}>
-                {label}
+                {t(labelKey)}
                 <span
                   className="col-resizer"
                   onMouseDown={(e) => onResizeStart(e, key)}
@@ -273,8 +275,8 @@ const FSEventsPanel = forwardRef<FSEventsPanelHandle, FSEventsPanelProps>(
         <div className="flex-fill">
           {events.length === 0 ? (
             <div className="events-empty" role="status">
-              <p>No recent file events yet.</p>
-              <p className="events-empty__hint">Keep working and check back for updates.</p>
+              <p>{t('events.empty.title')}</p>
+              <p className="events-empty__hint">{t('events.empty.hint')}</p>
             </div>
           ) : (
             <div className="events-list-container" ref={listContainerRef}>

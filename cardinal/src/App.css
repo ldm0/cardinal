@@ -783,7 +783,7 @@ button:active {
   position: relative;
 }
 
-.status-rescan-button {
+.status-icon-button {
   width: 22px;
   height: 22px;
   padding: 0;
@@ -791,7 +791,7 @@ button:active {
   border: none;
   background: rgba(255, 255, 255, 0.9);
   color: rgba(33, 37, 41, 0.9);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
@@ -805,15 +805,15 @@ button:active {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
 }
 
-.status-rescan-button:hover:not(:disabled),
-.status-rescan-button:focus-visible:not(:disabled) {
+.status-icon-button:hover:not(:disabled),
+.status-icon-button:focus-visible:not(:disabled) {
   background: rgba(248, 249, 252, 1);
   color: rgba(33, 37, 41, 0.96);
   box-shadow: 0 2px 4px rgba(15, 23, 42, 0.18);
   outline: none;
 }
 
-.status-rescan-button:disabled {
+.status-icon-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
   box-shadow: none;
@@ -870,6 +870,7 @@ button:active {
 .status-tab__label,
 .status-tab__value {
   line-height: 1;
+  white-space: nowrap;
 }
 
 .status-tab__icon {
@@ -907,14 +908,14 @@ button:active {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   }
 
-  .status-rescan-button {
+  .status-icon-button {
     background: rgba(38, 47, 61, 0.82);
     color: rgba(226, 232, 240, 0.86);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   }
 
-  .status-rescan-button:hover:not(:disabled),
-  .status-rescan-button:focus-visible:not(:disabled) {
+  .status-icon-button:hover:not(:disabled),
+  .status-icon-button:focus-visible:not(:disabled) {
     background: rgba(53, 63, 80, 0.92);
     color: rgba(248, 250, 252, 0.96);
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
@@ -953,7 +954,31 @@ button:active {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
+}
+
+.status-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.language-switcher {
+  position: relative;
+  line-height: 1;
+}
+
+.language-switcher__display {
+  pointer-events: none;
+  font-size: 10px;
+}
+
+.language-switcher__select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  border: none;
+  cursor: pointer;
 }
 
 .readiness-indicator {

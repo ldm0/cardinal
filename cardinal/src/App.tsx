@@ -25,6 +25,7 @@ import {
   checkFullDiskAccessPermission,
   requestFullDiskAccessPermission,
 } from 'tauri-plugin-macos-permissions-api';
+import { useTranslation } from 'react-i18next';
 
 type ActiveTab = StatusTabKey;
 
@@ -64,6 +65,7 @@ function App() {
     caseSensitive,
     useRegex,
   });
+  const { t } = useTranslation();
 
   const {
     menu: filesMenu,
@@ -264,8 +266,10 @@ function App() {
 
   const showFullDiskAccessOverlay = fullDiskAccessStatus === 'denied';
   const overlayStatusMessage = isCheckingFullDiskAccess
-    ? 'Checking permission status...'
-    : 'Full Disk Access is disabled.';
+    ? t('app.fullDiskAccess.status.checking')
+    : t('app.fullDiskAccess.status.disabled');
+  const caseSensitiveLabel = t('search.options.caseSensitive');
+  const regexLabel = t('search.options.regex');
 
   return (
     <>
@@ -278,8 +282,8 @@ function App() {
               onChange={onQueryChange}
               placeholder={
                 activeTab === 'files'
-                  ? 'Search for files and folders...'
-                  : 'Filter events by path or name...'
+                  ? t('search.placeholder.files')
+                  : t('search.placeholder.events')
               }
               spellCheck={false}
               autoCorrect="off"
@@ -287,29 +291,29 @@ function App() {
               autoCapitalize="off"
             />
             <div className="search-options">
-              <label className="search-option" title="Toggle case-sensitive matching">
+              <label className="search-option" title={caseSensitiveLabel}>
                 <input
                   type="checkbox"
                   checked={caseSensitive}
                   onChange={onToggleCaseSensitive}
-                  aria-label="Toggle case-sensitive matching"
+                  aria-label={caseSensitiveLabel}
                 />
                 <span className="search-option__display" aria-hidden="true">
                   Aa
                 </span>
-                <span className="sr-only">Toggle case-sensitive matching</span>
+                <span className="sr-only">{caseSensitiveLabel}</span>
               </label>
-              <label className="search-option" title="Enable regular expression search">
+              <label className="search-option" title={regexLabel}>
                 <input
                   type="checkbox"
                   checked={useRegex}
                   onChange={onToggleRegex}
-                  aria-label="Enable regular expression search"
+                  aria-label={regexLabel}
                 />
                 <span className="search-option__display" aria-hidden="true">
                   .*
                 </span>
-                <span className="sr-only">Enable regular expression search</span>
+                <span className="sr-only">{regexLabel}</span>
               </label>
             </div>
           </div>
@@ -371,15 +375,12 @@ function App() {
       {showFullDiskAccessOverlay && (
         <div className="permission-overlay">
           <div className="permission-card" role="dialog" aria-modal="true">
-            <h1>Full Disk Access Required</h1>
-            <p>
-              Cardinal needs macOS Full Disk Access to index and monitor files across your system.
-              Please enable Full Disk Access for Cardinal in System Settings.
-            </p>
+            <h1>{t('app.fullDiskAccess.title')}</h1>
+            <p>{t('app.fullDiskAccess.description')}</p>
             <ol>
-              <li>Open System Settings &gt; Privacy &amp; Security &gt; Full Disk Access.</li>
-              <li>Click the lock to make changes and enable Cardinal.</li>
-              <li>When prompted, allow macOS to restart Cardinal.</li>
+              <li>{t('app.fullDiskAccess.steps.one')}</li>
+              <li>{t('app.fullDiskAccess.steps.two')}</li>
+              <li>{t('app.fullDiskAccess.steps.three')}</li>
             </ol>
             <p className="permission-status" role="status" aria-live="polite">
               {overlayStatusMessage}
@@ -390,7 +391,7 @@ function App() {
                 onClick={requestFullDiskAccessPermission}
                 disabled={isCheckingFullDiskAccess}
               >
-                Open System Settings
+                {t('app.fullDiskAccess.openSettings')}
               </button>
             </div>
           </div>

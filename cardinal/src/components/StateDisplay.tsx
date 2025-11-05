@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 type StateProps = {
   icon: React.ReactNode;
@@ -28,13 +29,14 @@ export function StateDisplay({
   message,
   query,
 }: StateDisplayProps): React.JSX.Element | null {
+  const { t } = useTranslation();
   if (state === 'loading') {
-    return <State icon={<div className="spinner" />} title="Searching..." />;
+    return <State icon={<div className="spinner" />} title={t('stateDisplay.loading')} />;
   }
 
   if (state === 'error') {
     return (
-      <State icon={<div className="error-icon">!</div>} title="Search Error" message={message} />
+      <State icon={<div className="error-icon">!</div>} title={t('stateDisplay.error')} message={message} />
     );
   }
 
@@ -57,11 +59,12 @@ export function StateDisplay({
         <line x1="9" y1="9" x2="13" y2="13" />
       </svg>
     );
+    const emptyTitle = t('stateDisplay.emptyTitle', { query: query ?? '' });
     return (
       <State
         icon={icon}
-        title={`No results for "${query}"`}
-        message="Try adjusting your keywords or filters."
+        title={emptyTitle}
+        message={t('stateDisplay.emptyMessage')}
       />
     );
   }

@@ -1,0 +1,89 @@
+{
+  "search": {
+    "placeholder": {
+      "files": "Nach Dateien und Ordnern suchen...",
+      "events": "Ereignisse nach Pfad oder Name filtern..."
+    },
+    "options": {
+      "caseSensitive": "Groß-/Kleinschreibung beachten",
+      "regex": "Suche mit regulären Ausdrücken aktivieren"
+    }
+  },
+  "stateDisplay": {
+    "loading": "Suche läuft...",
+    "error": "Suchfehler",
+    "emptyTitle": "Keine Ergebnisse für \"{{query}}\"",
+    "emptyMessage": "Passe deine Suchbegriffe oder Filter an."
+  },
+  "columns": {
+    "filename": "Dateiname",
+    "path": "Pfad",
+    "size": "Größe",
+    "modified": "Geändert",
+    "created": "Erstellt"
+  },
+  "events": {
+    "columns": {
+      "time": "Zeit",
+      "name": "Dateiname",
+      "path": "Pfad"
+    },
+    "empty": {
+      "title": "Noch keine aktuellen Dateiereignisse.",
+      "hint": "Arbeite weiter und schau später erneut vorbei."
+    }
+  },
+  "contextMenu": {
+    "openInFinder": "In Finder öffnen",
+    "copyPath": "Pfad kopieren",
+    "resetColumnWidths": "Spaltenbreiten zurücksetzen"
+  },
+  "statusBar": {
+    "tabs": {
+      "files": "Dateien",
+      "events": "Ereignisse"
+    },
+    "lifecycle": {
+      "Initializing": "Initialisierung",
+      "Ready": "Bereit",
+      "Closing": "Beenden"
+    },
+    "aria": {
+      "status": "Anwendungsstatus: {{status}}",
+      "tablist": "Ansicht des Suchstatus",
+      "rescan": "Dateisystem erneut scannen"
+    },
+    "rescan": {
+      "disabledHint": "Der erneute Scan ist verfügbar, sobald Cardinal die Initialisierung abgeschlossen hat.",
+      "enabledHint": "Einen vollständigen Scan des Dateisystems starten."
+    },
+    "searchLabel": "Suche:",
+    "resultsUnavailable": "—",
+    "resultsCount_one": "{{formatted}} Ergebnis",
+    "resultsCount_other": "{{formatted}} Ergebnisse",
+    "duration": "{{value}} ms",
+    "resultsWithDuration": "{{results}} • {{duration}}",
+    "resultsTitle": "Ergebnisse • Dauer"
+  },
+  "app": {
+    "fullDiskAccess": {
+      "title": "Voller Festplattenzugriff erforderlich",
+      "description": "Cardinal benötigt den vollen Festplattenzugriff von macOS, um Dateien auf deinem System zu indexieren und zu überwachen. Aktiviere den vollen Festplattenzugriff für Cardinal in den Systemeinstellungen.",
+      "steps": {
+        "one": "Öffne Systemeinstellungen > Datenschutz & Sicherheit > Voller Festplattenzugriff.",
+        "two": "Klicke auf das Schloss, erlaube Änderungen und aktiviere Cardinal.",
+        "three": "Erlaube macOS, Cardinal bei Aufforderung neu zu starten."
+      },
+      "status": {
+        "checking": "Berechtigungsstatus wird überprüft...",
+        "disabled": "Voller Festplattenzugriff ist deaktiviert."
+      },
+      "openSettings": "Systemeinstellungen öffnen"
+    }
+  },
+  "language": {
+    "label": "Sprache",
+    "separator": ":",
+    "trigger": "🌐"
+  }
+}

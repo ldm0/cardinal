@@ -1,0 +1,89 @@
+{
+  "search": {
+    "placeholder": {
+      "files": "Buscar archivos y carpetas...",
+      "events": "Filtrar eventos por ruta o nombre..."
+    },
+    "options": {
+      "caseSensitive": "Activar coincidencia sensible a mayúsculas",
+      "regex": "Habilitar búsqueda con expresiones regulares"
+    }
+  },
+  "stateDisplay": {
+    "loading": "Buscando...",
+    "error": "Error de búsqueda",
+    "emptyTitle": "Sin resultados para \"{{query}}\"",
+    "emptyMessage": "Prueba ajustando tus palabras clave o filtros."
+  },
+  "columns": {
+    "filename": "Nombre de archivo",
+    "path": "Ruta",
+    "size": "Tamaño",
+    "modified": "Modificado",
+    "created": "Creado"
+  },
+  "events": {
+    "columns": {
+      "time": "Hora",
+      "name": "Nombre de archivo",
+      "path": "Ruta"
+    },
+    "empty": {
+      "title": "Todavía no hay eventos de archivos recientes.",
+      "hint": "Sigue trabajando y vuelve a revisar más tarde."
+    }
+  },
+  "contextMenu": {
+    "openInFinder": "Abrir en Finder",
+    "copyPath": "Copiar ruta",
+    "resetColumnWidths": "Restablecer ancho de columnas"
+  },
+  "statusBar": {
+    "tabs": {
+      "files": "Archivos",
+      "events": "Eventos"
+    },
+    "lifecycle": {
+      "Initializing": "Inicializando",
+      "Ready": "Listo",
+      "Closing": "Cerrando"
+    },
+    "aria": {
+      "status": "Estado de la aplicación: {{status}}",
+      "tablist": "Vista de estado de búsqueda",
+      "rescan": "Lanzar reexploración del sistema de archivos"
+    },
+    "rescan": {
+      "disabledHint": "El reescaneo estará disponible cuando Cardinal termine de inicializarse.",
+      "enabledHint": "Iniciar un reescaneo completo del sistema de archivos."
+    },
+    "searchLabel": "Búsqueda:",
+    "resultsUnavailable": "—",
+    "resultsCount_one": "{{formatted}} resultado",
+    "resultsCount_other": "{{formatted}} resultados",
+    "duration": "{{value}} ms",
+    "resultsWithDuration": "{{results}} • {{duration}}",
+    "resultsTitle": "Resultados • Duración"
+  },
+  "app": {
+    "fullDiskAccess": {
+      "title": "Se requiere acceso completo al disco",
+      "description": "Cardinal necesita acceso completo al disco de macOS para indexar y monitorizar archivos en tu sistema. Activa el acceso completo al disco para Cardinal en Ajustes del sistema.",
+      "steps": {
+        "one": "Abre Ajustes del sistema > Privacidad y seguridad > Acceso completo al disco.",
+        "two": "Haz clic en el candado para permitir cambios y habilita Cardinal.",
+        "three": "Cuando se te pida, permite que macOS reinicie Cardinal."
+      },
+      "status": {
+        "checking": "Comprobando el estado de los permisos...",
+        "disabled": "El acceso completo al disco está desactivado."
+      },
+      "openSettings": "Abrir Ajustes del sistema"
+    }
+  },
+  "language": {
+    "label": "Idioma",
+    "separator": ":",
+    "trigger": "🌐"
+  }
+}

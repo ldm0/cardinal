@@ -1,0 +1,89 @@
+{
+  "search": {
+    "placeholder": {
+      "files": "Search for files and folders...",
+      "events": "Filter events by path or name..."
+    },
+    "options": {
+      "caseSensitive": "Toggle case-sensitive matching",
+      "regex": "Enable regular expression search"
+    }
+  },
+  "stateDisplay": {
+    "loading": "Searching...",
+    "error": "Search Error",
+    "emptyTitle": "No results for \"{{query}}\"",
+    "emptyMessage": "Try adjusting your keywords or filters."
+  },
+  "columns": {
+    "filename": "Filename",
+    "path": "Path",
+    "size": "Size",
+    "modified": "Modified",
+    "created": "Created"
+  },
+  "events": {
+    "columns": {
+      "time": "Time",
+      "name": "Filename",
+      "path": "Path"
+    },
+    "empty": {
+      "title": "No recent file events yet.",
+      "hint": "Keep working and check back for updates."
+    }
+  },
+  "contextMenu": {
+    "openInFinder": "Open in Finder",
+    "copyPath": "Copy Path",
+    "resetColumnWidths": "Reset Column Widths"
+  },
+  "statusBar": {
+    "tabs": {
+      "files": "Files",
+      "events": "Events"
+    },
+    "lifecycle": {
+      "Initializing": "Initializing",
+      "Ready": "Ready",
+      "Closing": "Closing"
+    },
+    "aria": {
+      "status": "Application status: {{status}}",
+      "tablist": "Search status view",
+      "rescan": "Trigger filesystem rescan"
+    },
+    "rescan": {
+      "disabledHint": "Rescan becomes available once Cardinal finishes initializing.",
+      "enabledHint": "Trigger a full filesystem rescan."
+    },
+    "searchLabel": "Search:",
+    "resultsUnavailable": "—",
+    "resultsCount_one": "{{formatted}} result",
+    "resultsCount_other": "{{formatted}} results",
+    "duration": "{{value}}ms",
+    "resultsWithDuration": "{{results}} • {{duration}}",
+    "resultsTitle": "Results • Duration"
+  },
+  "app": {
+    "fullDiskAccess": {
+      "title": "Full Disk Access Required",
+      "description": "Cardinal needs macOS Full Disk Access to index and monitor files across your system. Please enable Full Disk Access for Cardinal in System Settings.",
+      "steps": {
+        "one": "Open System Settings > Privacy & Security > Full Disk Access.",
+        "two": "Click the lock to make changes and enable Cardinal.",
+        "three": "When prompted, allow macOS to restart Cardinal."
+      },
+      "status": {
+        "checking": "Checking permission status...",
+        "disabled": "Full Disk Access is disabled."
+      },
+      "openSettings": "Open System Settings"
+    }
+  },
+  "language": {
+    "label": "Language",
+    "separator": ":",
+    "trigger": "🌐"
+  }
+}

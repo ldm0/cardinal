@@ -1,0 +1,88 @@
+{
+  "search": {
+    "placeholder": {
+      "files": "搜索文件和文件夹…",
+      "events": "按路径或名称筛选事件…"
+    },
+    "options": {
+      "caseSensitive": "切换区分大小写匹配",
+      "regex": "启用正则表达式搜索"
+    }
+  },
+  "stateDisplay": {
+    "loading": "正在搜索…",
+    "error": "搜索出现错误",
+    "emptyTitle": "\"{{query}}\" 没有匹配结果",
+    "emptyMessage": "尝试调整关键字或筛选条件。"
+  },
+  "columns": {
+    "filename": "文件名",
+    "path": "路径",
+    "size": "大小",
+    "modified": "修改时间",
+    "created": "创建时间"
+  },
+  "events": {
+    "columns": {
+      "time": "时间",
+      "name": "文件名",
+      "path": "路径"
+    },
+    "empty": {
+      "title": "暂无文件事件。",
+      "hint": "继续工作，稍后再回来查看更新。"
+    }
+  },
+  "contextMenu": {
+    "openInFinder": "在 Finder 中打开",
+    "copyPath": "复制路径",
+    "resetColumnWidths": "重置列宽"
+  },
+  "statusBar": {
+    "tabs": {
+      "files": "文件",
+      "events": "事件"
+    },
+    "lifecycle": {
+      "Initializing": "正在初始化",
+      "Ready": "就绪",
+      "Closing": "正在关闭"
+    },
+    "aria": {
+      "status": "应用状态：{{status}}",
+      "tablist": "搜索状态视图",
+      "rescan": "触发文件系统重新扫描"
+    },
+    "rescan": {
+      "disabledHint": "Cardinal 完成初始化后即可重新扫描。",
+      "enabledHint": "触发一次完整的文件系统重新扫描。"
+    },
+    "searchLabel": "搜索：",
+    "resultsUnavailable": "—",
+    "resultsCount_other": "{{formatted}} 个结果",
+    "duration": "{{value}} 毫秒",
+    "resultsWithDuration": "{{results}} • {{duration}}",
+    "resultsTitle": "结果 • 耗时"
+  },
+  "app": {
+    "fullDiskAccess": {
+      "title": "需要完全磁盘访问权限",
+      "description": "Cardinal 需要 macOS 的完全磁盘访问权限才能索引并监控系统中的文件。请在系统设置中为 Cardinal 启用完全磁盘访问。",
+      "steps": {
+        "one": "打开 系统设置 > 隐私与安全性 > 完全磁盘访问。",
+        "two": "点击锁形图标以允许更改，并启用 Cardinal。",
+        "three": "按提示允许 macOS 重新启动 Cardinal。"
+      },
+      "status": {
+        "checking": "正在检查权限状态…",
+        "disabled": "完全磁盘访问权限已禁用。"
+      },
+      "openSettings": "打开系统设置"
+    }
+  },
+  "language": {
+    "label": "语言",
+    "separator": "：",
+    "trigger": "🌐"
+  }
+}

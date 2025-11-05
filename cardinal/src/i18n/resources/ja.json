@@ -1,0 +1,89 @@
+{
+  "search": {
+    "placeholder": {
+      "files": "ファイルやフォルダを検索...",
+      "events": "パスまたは名前でイベントを絞り込む..."
+    },
+    "options": {
+      "caseSensitive": "大文字と小文字を区別する",
+      "regex": "正規表現検索を有効にする"
+    }
+  },
+  "stateDisplay": {
+    "loading": "検索中...",
+    "error": "検索エラー",
+    "emptyTitle": "\"{{query}}\" に一致する結果がありません",
+    "emptyMessage": "キーワードやフィルターを調整してください。"
+  },
+  "columns": {
+    "filename": "ファイル名",
+    "path": "パス",
+    "size": "サイズ",
+    "modified": "更新日時",
+    "created": "作成日時"
+  },
+  "events": {
+    "columns": {
+      "time": "時刻",
+      "name": "ファイル名",
+      "path": "パス"
+    },
+    "empty": {
+      "title": "最近のファイルイベントはまだありません。",
+      "hint": "作業を続けて、後でもう一度確認してください。"
+    }
+  },
+  "contextMenu": {
+    "openInFinder": "Finder で開く",
+    "copyPath": "パスをコピー",
+    "resetColumnWidths": "列幅をリセット"
+  },
+  "statusBar": {
+    "tabs": {
+      "files": "ファイル",
+      "events": "イベント"
+    },
+    "lifecycle": {
+      "Initializing": "初期化中",
+      "Ready": "準備完了",
+      "Closing": "終了処理中"
+    },
+    "aria": {
+      "status": "アプリケーションの状態: {{status}}",
+      "tablist": "検索ステータスビュー",
+      "rescan": "ファイルシステムの再スキャンを実行"
+    },
+    "rescan": {
+      "disabledHint": "Cardinal の初期化が完了すると再スキャンが利用可能になります。",
+      "enabledHint": "ファイルシステム全体の再スキャンを実行します。"
+    },
+    "searchLabel": "検索:",
+    "resultsUnavailable": "—",
+    "resultsCount_one": "{{formatted}} 件",
+    "resultsCount_other": "{{formatted}} 件",
+    "duration": "{{value}} ミリ秒",
+    "resultsWithDuration": "{{results}} • {{duration}}",
+    "resultsTitle": "結果 • 所要時間"
+  },
+  "app": {
+    "fullDiskAccess": {
+      "title": "フルディスクアクセスが必要です",
+      "description": "Cardinal がシステム全体のファイルをインデックス化・監視するには、macOS のフルディスクアクセスが必要です。システム設定で Cardinal のフルディスクアクセスを有効にしてください。",
+      "steps": {
+        "one": "システム設定 > プライバシーとセキュリティ > フルディスクアクセス を開きます。",
+        "two": "変更を許可するために錠前をクリックし、Cardinal を有効にします。",
+        "three": "求められたら、macOS に Cardinal の再起動を許可します。"
+      },
+      "status": {
+        "checking": "権限の状態を確認しています...",
+        "disabled": "フルディスクアクセスが無効です。"
+      },
+      "openSettings": "システム設定を開く"
+    }
+  },
+  "language": {
+    "label": "言語",
+    "separator": "：",
+    "trigger": "🌐"
+  }
+}

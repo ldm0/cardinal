@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { ContextMenuItem } from '../components/ContextMenu';
+import { useTranslation } from 'react-i18next';
 
 type MenuType = 'file' | 'header' | null;
 
@@ -22,6 +23,7 @@ type UseContextMenuResult = {
 };
 
 export function useContextMenu(autoFitColumns: (() => void) | null = null): UseContextMenuResult {
+  const { t } = useTranslation();
   const [menu, setMenu] = useState<ContextMenuState>({
     visible: false,
     x: 0,
@@ -69,11 +71,11 @@ export function useContextMenu(autoFitColumns: (() => void) | null = null): UseC
     if (menu.type === 'file' && path) {
       return [
         {
-          label: 'Open in Finder',
+          label: t('contextMenu.openInFinder'),
           action: () => invoke('open_in_finder', { path }),
         },
         {
-          label: 'Copy Path',
+          label: t('contextMenu.copyPath'),
           action: () => navigator.clipboard.writeText(path),
         },
       ];
@@ -81,13 +83,13 @@ export function useContextMenu(autoFitColumns: (() => void) | null = null): UseC
     if (menu.type === 'header' && autoFitColumns) {
       return [
         {
-          label: 'Reset Column Widths',
+          label: t('contextMenu.resetColumnWidths'),
           action: autoFitColumns,
         },
       ];
     }
     return [];
-  }, [menu, autoFitColumns]);
+  }, [menu, autoFitColumns, t]);
 
   return {
     menu,
