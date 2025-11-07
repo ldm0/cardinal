@@ -22,6 +22,15 @@
     "modified": "更新日時",
     "created": "作成日時"
   },
+  "sorting": {
+    "labels": {
+      "fullPath": "フルパス",
+      "size": "サイズ",
+      "mtime": "更新日時",
+      "ctime": "作成日時"
+    },
+    "disabled": "結果が {{limit}} 件を超えているため並べ替えできません。"
+  },
   "events": {
     "columns": {
       "time": "時刻",

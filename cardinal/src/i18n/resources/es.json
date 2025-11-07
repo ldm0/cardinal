@@ -22,6 +22,15 @@
     "modified": "Modificado",
     "created": "Creado"
   },
+  "sorting": {
+    "labels": {
+      "fullPath": "Ruta completa",
+      "size": "Tamaño",
+      "mtime": "Hora de modificación",
+      "ctime": "Hora de creación"
+    },
+    "disabled": "Hay más de {{limit}} resultados. No se puede ordenar."
+  },
   "events": {
     "columns": {
       "time": "Hora",

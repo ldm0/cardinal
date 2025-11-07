@@ -1,7 +1,7 @@
 use crate::lifecycle::load_app_state;
 use anyhow::Result as AnyhowResult;
 use base64::{Engine as _, engine::general_purpose};
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, bounded};
 use search_cache::{SearchOptions, SearchResultNode, SlabIndex, SlabNodeMetadata};
 use serde::{Deserialize, Serialize};
 use std::process::Command;
@@ -36,12 +36,17 @@ pub struct SearchJob {
     pub options: SearchOptionsPayload,
 }
 
+#[derive(Debug, Clone)]
+pub struct NodeInfoRequest {
+    pub slab_indices: Vec<SlabIndex>,
+    pub response_tx: Sender<Vec<SearchResultNode>>,
+}
+
 pub struct SearchState {
     search_tx: Sender<SearchJob>,
     result_rx: Receiver<AnyhowResult<Vec<SlabIndex>>>,
 
-    node_info_tx: Sender<Vec<SlabIndex>>,
-    node_info_results_rx: Receiver<Vec<SearchResultNode>>,
+    node_info_tx: Sender<NodeInfoRequest>,
 
     icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
     rescan_tx: Sender<()>,
@@ -52,8 +57,7 @@ impl SearchState {
     pub fn new(
         search_tx: Sender<SearchJob>,
         result_rx: Receiver<AnyhowResult<Vec<SlabIndex>>>,
-        node_info_tx: Sender<Vec<SlabIndex>>,
-        node_info_results_rx: Receiver<Vec<SearchResultNode>>,
+        node_info_tx: Sender<NodeInfoRequest>,
         icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
         rescan_tx: Sender<()>,
     ) -> Self {
@@ -61,7 +65,6 @@ impl SearchState {
             search_tx,
             result_rx,
             node_info_tx,
-            node_info_results_rx,
             icon_viewport_tx,
             rescan_tx,
         }
@@ -117,19 +120,25 @@ pub async fn search(
 #[tauri::command]
 pub async fn get_nodes_info(
     results: Vec<SlabIndex>,
+    include_icons: Option<bool>,
     state: State<'_, SearchState>,
 ) -> Result<Vec<NodeInfo>, String> {
     if results.is_empty() {
         return Ok(Vec::new());
     }
 
+    let include_icons = include_icons.unwrap_or(true);
+    let (response_tx, response_rx) = bounded::<Vec<SearchResultNode>>(1);
+
     state
         .node_info_tx
-        .send(results.clone())
+        .send(NodeInfoRequest {
+            slab_indices: results,
+            response_tx,
+        })
         .map_err(|e| format!("Failed to send node info request: {e:?}"))?;
 
-    let nodes = state
-        .node_info_results_rx
+    let nodes = response_rx
         .recv()
         .map_err(|e| format!("Failed to receive node info results: {e:?}"))?;
 
@@ -137,12 +146,16 @@ pub async fn get_nodes_info(
         .into_iter()
         .map(|SearchResultNode { path, metadata }| {
             let path = path.to_string_lossy().into_owned();
-            let icon = fs_icon::icon_of_path_ns(&path).map(|data| {
-                format!(
-                    "data:image/png;base64,{}",
-                    general_purpose::STANDARD.encode(data)
-                )
-            });
+            let icon = if include_icons {
+                fs_icon::icon_of_path_ns(&path).map(|data| {
+                    format!(
+                        "data:image/png;base64,{}",
+                        general_purpose::STANDARD.encode(data)
+                    )
+                })
+            } else {
+                None
+            };
             NodeInfo {
                 path,
                 icon,

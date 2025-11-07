@@ -437,6 +437,112 @@ button:active {
   white-space: nowrap;
 }
 
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.sort-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.sort-button:focus-visible {
+  outline: 1px solid rgba(var(--color-accent-rgb), 0.4);
+  outline-offset: 2px;
+}
+
+.sort-button__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.sort-indicator {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--color-header);
+}
+
+.sort-indicator--active {
+  color: var(--color-accent);
+}
+
+.sort-indicator::before,
+.sort-indicator::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  opacity: 0.35;
+}
+
+.sort-indicator::before {
+  top: 0;
+  border-bottom: 5px solid currentColor;
+}
+
+.sort-indicator::after {
+  bottom: 0;
+  border-top: 5px solid currentColor;
+}
+
+.sort-indicator--asc::before {
+  opacity: 1;
+}
+
+.sort-indicator--asc::after {
+  opacity: 0.15;
+}
+
+.sort-indicator--desc::after {
+  opacity: 1;
+}
+
+.sort-indicator--desc::before {
+  opacity: 0.15;
+}
+
+.sort-indicator--neutral::before,
+.sort-indicator--neutral::after {
+  opacity: 0.35;
+}
+
+.sort-indicator--disabled {
+  opacity: 0.3;
+}
+
+.sort-indicator--circle {
+  width: 10px;
+  height: 10px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  opacity: 0.8;
+}
+
+.sort-indicator--circle::before,
+.sort-indicator--circle::after {
+  display: none;
+}
+
 .header-scrollbar-spacer {
   /* Spacer cell used to align the virtual scrollbar area. */
   width: var(--virtual-scrollbar-width);

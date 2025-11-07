@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
 import type { ChangeEvent, CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import './App.css';
 import { ContextMenu } from './components/ContextMenu';
@@ -6,7 +6,7 @@ import { ColumnHeader } from './components/ColumnHeader';
 import { FileRow } from './components/FileRow';
 import StatusBar from './components/StatusBar';
 import type { StatusTabKey } from './components/StatusBar';
-import type { SearchResultItem } from './types/search';
+import type { NodeInfoResponse, SearchResultItem } from './types/search';
 import type { AppLifecycleStatus, StatusBarUpdatePayload } from './types/ipc';
 import { useColumnResize } from './hooks/useColumnResize';
 import { useContextMenu } from './hooks/useContextMenu';
@@ -27,6 +27,75 @@ import {
   requestFullDiskAccessPermission,
 } from 'tauri-plugin-macos-permissions-api';
 import { useTranslation } from 'react-i18next';
+import type { SlabIndex } from './types/slab';
+import type { SortKey, SortState } from './types/sort';
+
+const SORTABLE_RESULT_THRESHOLD = 1000;
+const SORT_INDICATOR_CIRCLE_THRESHOLD = 10000;
+
+type SortableMetadata = {
+  path: string;
+  size: number | null;
+  mtime: number | null;
+  ctime: number | null;
+};
+
+type SortEntry = {
+  slabIndex: SlabIndex;
+  idx: number;
+};
+
+const normalizePath = (value: string | undefined | null): string =>
+  value ? value.toLocaleLowerCase() : '';
+
+const numericValue = (metadata: SortableMetadata | undefined, key: SortKey): number => {
+  switch (key) {
+    case 'size':
+      return typeof metadata?.size === 'number' ? metadata.size : Number.MIN_SAFE_INTEGER;
+    case 'mtime':
+      return typeof metadata?.mtime === 'number' ? metadata.mtime : Number.MIN_SAFE_INTEGER;
+    case 'ctime':
+      return typeof metadata?.ctime === 'number' ? metadata.ctime : Number.MIN_SAFE_INTEGER;
+    default:
+      return Number.MIN_SAFE_INTEGER;
+  }
+};
+
+const compareEntries = (
+  a: SortEntry,
+  b: SortEntry,
+  sortState: Exclude<SortState, null>,
+  metadataMap: Map<number, SortableMetadata>,
+): number => {
+  const direction = sortState.direction === 'asc' ? 1 : -1;
+  const metaA = metadataMap.get(a.slabIndex as number);
+  const metaB = metadataMap.get(b.slabIndex as number);
+
+  switch (sortState.key) {
+    case 'fullPath': {
+      const comparison = normalizePath(metaA?.path).localeCompare(normalizePath(metaB?.path), undefined, {
+        sensitivity: 'base',
+      });
+      if (comparison !== 0) {
+        return comparison * direction;
+      }
+      break;
+    }
+    case 'size':
+    case 'mtime':
+    case 'ctime': {
+      const diff = numericValue(metaA, sortState.key) - numericValue(metaB, sortState.key);
+      if (diff !== 0) {
+        return diff > 0 ? direction : -direction;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  return a.idx - b.idx;
+};
 
 type ActiveTab = StatusTabKey;
 
@@ -54,6 +123,10 @@ function App() {
     searchError,
     lifecycleState,
   } = state;
+  const [sortState, setSortState] = useState<SortState>(null);
+  const [sortedResults, setSortedResults] = useState<SlabIndex[]>(results);
+  const sortMetadataRef = useRef<Map<number, SortableMetadata>>(new Map());
+  const sortRequestRef = useRef(0);
   const [activeTab, setActiveTab] = useState<ActiveTab>('files');
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [isWindowFocused, setIsWindowFocused] = useState<boolean>(() => {
@@ -62,6 +135,11 @@ function App() {
     }
     return document.hasFocus();
   });
+  const totalResults = resultCount || results.length;
+  const canSort = totalResults <= SORTABLE_RESULT_THRESHOLD;
+  const shouldUseSortedResults = Boolean(sortState && canSort);
+  const showCircleIndicators = totalResults > SORT_INDICATOR_CIRCLE_THRESHOLD;
+  const displayedResults = shouldUseSortedResults ? sortedResults : results;
   const eventsPanelRef = useRef<FSEventsPanelHandle | null>(null);
   const headerRef = useRef<HTMLDivElement | null>(null);
   const virtualListRef = useRef<VirtualListHandle | null>(null);
@@ -74,10 +152,30 @@ function App() {
     caseSensitive,
     useRegex,
   });
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const sortLimitText = useMemo(
+    () => new Intl.NumberFormat(i18n.language).format(SORTABLE_RESULT_THRESHOLD),
+    [i18n.language],
+  );
+  const sortDisabledTooltip = canSort ? null : t('sorting.disabled', { limit: sortLimitText });
   const handleRowSelect = useCallback((path: string) => {
     setSelectedPath(path);
   }, []);
+  const handleSortToggle = useCallback(
+    (nextKey: SortKey) => {
+      if (!canSort) return;
+      setSortState((prev) => {
+        if (!prev || prev.key !== nextKey) {
+          return { key: nextKey, direction: 'asc' };
+        }
+        if (prev.direction === 'asc') {
+          return { key: nextKey, direction: 'desc' };
+        }
+        return null;
+      });
+    },
+    [canSort],
+  );
 
   const {
     menu: filesMenu,
@@ -135,6 +233,41 @@ function App() {
     });
   }, []);
 
+  const ensureSortMetadata = useCallback(async (indices: SlabIndex[]) => {
+    const missing: SlabIndex[] = [];
+    indices.forEach((index) => {
+      const key = index as number;
+      if (!sortMetadataRef.current.has(key)) {
+        missing.push(index);
+      }
+    });
+
+    if (missing.length === 0) {
+      return sortMetadataRef.current;
+    }
+
+    const fetched = await invoke<NodeInfoResponse[]>('get_nodes_info', {
+      results: missing,
+      include_icons: false,
+    });
+
+    const nextMap = new Map(sortMetadataRef.current);
+    fetched.forEach((node, idx) => {
+      const slabIndex = missing[idx];
+      if (!node || slabIndex === undefined) {
+        return;
+      }
+      nextMap.set(slabIndex as number, {
+        path: node.path,
+        size: typeof node.metadata?.size === 'number' ? node.metadata.size : null,
+        mtime: node.metadata?.mtime ?? null,
+        ctime: node.metadata?.ctime ?? null,
+      });
+    });
+    sortMetadataRef.current = nextMap;
+    return nextMap;
+  }, []);
+
   useEffect(() => {
     isMountedRef.current = true;
     let unlistenStatus: UnlistenFn | undefined;
@@ -176,6 +309,48 @@ function App() {
   useEffect(() => {
     focusSearchInput();
   }, [focusSearchInput]);
+
+  useEffect(() => {
+    sortMetadataRef.current = new Map();
+    setSortedResults(results);
+  }, [results]);
+
+  const runSort = useCallback(
+    async (activeSort: SortState, sourceResults: SlabIndex[]) => {
+      if (!activeSort || !canSort || sourceResults.length === 0) {
+        setSortedResults(sourceResults);
+        return;
+      }
+
+      const requestId = sortRequestRef.current + 1;
+      sortRequestRef.current = requestId;
+
+      try {
+        await ensureSortMetadata(sourceResults);
+        if (sortRequestRef.current !== requestId) {
+          return;
+        }
+
+        const ordered = sourceResults
+          .map((slabIndex, idx) => ({ slabIndex, idx }))
+          .sort((a, b) => compareEntries(a, b, activeSort, sortMetadataRef.current));
+
+        if (sortRequestRef.current === requestId) {
+          setSortedResults(ordered.map((entry) => entry.slabIndex));
+        }
+      } catch (error) {
+        console.error('Failed to sort search results', error);
+        if (sortRequestRef.current === requestId) {
+          setSortedResults(sourceResults);
+        }
+      }
+    },
+    [canSort, ensureSortMetadata],
+  );
+
+  useEffect(() => {
+    void runSort(sortState, results);
+  }, [runSort, sortState, results]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -315,13 +490,13 @@ function App() {
 
     list.scrollToTop?.();
 
-    if (!results.length || !list.ensureRangeLoaded) {
+    if (!displayedResults.length || !list.ensureRangeLoaded) {
       return;
     }
 
-    const preloadCount = Math.min(30, results.length);
+    const preloadCount = Math.min(30, displayedResults.length);
     list.ensureRangeLoaded(0, preloadCount - 1);
-  }, [results]);
+  }, [displayedResults]);
 
   const handleHorizontalSync = useCallback((scrollLeft: number) => {
     // VirtualList drives the scroll position; mirror it onto the sticky header for alignment
@@ -480,6 +655,11 @@ function App() {
                 ref={headerRef}
                 onResizeStart={onResizeStart}
                 onContextMenu={showHeaderContextMenu}
+                sortState={sortState}
+                onSortToggle={handleSortToggle}
+                sortDisabled={!canSort}
+                sortIndicatorMode={showCircleIndicators ? 'circle' : 'triangle'}
+                sortDisabledTooltip={sortDisabledTooltip}
               />
               <div className="flex-fill">
                 {displayState !== 'results' ? (
@@ -491,7 +671,7 @@ function App() {
                 ) : (
                   <VirtualList
                     ref={virtualListRef}
-                    results={results}
+                    results={displayedResults}
                     rowHeight={ROW_HEIGHT}
                     overscan={OVERSCAN_ROW_COUNT}
                     renderRow={renderRow}

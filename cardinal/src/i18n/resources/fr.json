@@ -22,6 +22,15 @@
     "modified": "Modifié",
     "created": "Créé"
   },
+  "sorting": {
+    "labels": {
+      "fullPath": "Chemin complet",
+      "size": "Taille",
+      "mtime": "Date de modification",
+      "ctime": "Date de création"
+    },
+    "disabled": "Plus de {{limit}} résultats. Le tri est indisponible."
+  },
   "events": {
     "columns": {
       "time": "Heure",

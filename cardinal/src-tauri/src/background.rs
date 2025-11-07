@@ -1,5 +1,5 @@
 use crate::{
-    commands::SearchJob,
+    commands::{NodeInfoRequest, SearchJob},
     lifecycle::{AppLifecycleState, load_app_state, update_app_state},
 };
 use anyhow::Result as AnyhowResult;
@@ -35,8 +35,7 @@ pub struct BackgroundLoopChannels {
     pub finish_rx: Receiver<Sender<Option<SearchCache>>>,
     pub search_rx: Receiver<SearchJob>,
     pub result_tx: Sender<AnyhowResult<Vec<SlabIndex>>>,
-    pub node_info_rx: Receiver<Vec<SlabIndex>>,
-    pub node_info_results_tx: Sender<Vec<SearchResultNode>>,
+    pub node_info_rx: Receiver<NodeInfoRequest>,
     pub icon_viewport_rx: Receiver<(u64, Vec<SlabIndex>)>,
     pub rescan_rx: Receiver<()>,
     pub icon_update_tx: Sender<IconPayload>,
@@ -87,7 +86,6 @@ pub fn run_background_event_loop(
         search_rx,
         result_tx,
         node_info_rx,
-        node_info_results_tx,
         icon_viewport_rx,
         rescan_rx,
         icon_update_tx,
@@ -111,10 +109,14 @@ pub fn run_background_event_loop(
                 };
                 result_tx.send(result).expect("Failed to send result");
             }
-            recv(node_info_rx) -> results => {
-                let results = results.expect("Node info channel closed");
-                let node_info_results = cache.expand_file_nodes(&results);
-                node_info_results_tx.send(node_info_results).expect("Failed to send node info results");
+            recv(node_info_rx) -> request => {
+                let request = request.expect("Node info channel closed");
+                let NodeInfoRequest {
+                    slab_indices,
+                    response_tx,
+                } = request;
+                let node_info_results = cache.expand_file_nodes(&slab_indices);
+                let _ = response_tx.send(node_info_results);
             }
             recv(icon_viewport_rx) -> update => {
                 let (_request_id, viewport) = update.expect("Icon viewport channel closed");

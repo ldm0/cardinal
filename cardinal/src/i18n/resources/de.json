@@ -22,6 +22,15 @@
     "modified": "Geändert",
     "created": "Erstellt"
   },
+  "sorting": {
+    "labels": {
+      "fullPath": "Vollständiger Pfad",
+      "size": "Größe",
+      "mtime": "Änderungszeit",
+      "ctime": "Erstellungszeit"
+    },
+    "disabled": "Mehr als {{limit}} Ergebnisse. Sortieren ist nicht möglich."
+  },
   "events": {
     "columns": {
       "time": "Zeit",

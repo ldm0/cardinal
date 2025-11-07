@@ -22,6 +22,15 @@
     "modified": "修改时间",
     "created": "创建时间"
   },
+  "sorting": {
+    "labels": {
+      "fullPath": "完整路径",
+      "size": "大小",
+      "mtime": "修改时间",
+      "ctime": "创建时间"
+    },
+    "disabled": "结果数量大于 {{limit}} 个，无法排序。"
+  },
   "events": {
     "columns": {
       "time": "时间",
