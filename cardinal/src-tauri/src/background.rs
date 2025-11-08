@@ -7,7 +7,9 @@ use base64::{Engine as _, engine::general_purpose};
 use cardinal_sdk::{EventFlag, EventWatcher};
 use crossbeam_channel::{Receiver, Sender};
 use rayon::spawn;
-use search_cache::{HandleFSEError, SearchCache, SearchOptions, SearchResultNode, SlabIndex};
+use search_cache::{
+    CancellationToken, HandleFSEError, SearchCache, SearchOptions, SearchResultNode, SlabIndex,
+};
 use serde::Serialize;
 use std::{
     path::PathBuf,
@@ -119,7 +121,7 @@ pub fn run_background_event_loop(
                     cache.search_with_options(
                         &query,
                         opts,
-                        Some((version, search_version.as_ref())),
+                        Some(CancellationToken::new(version, search_version.as_ref())),
                     )
                 };
                 result_tx.send(result).expect("Failed to send result");

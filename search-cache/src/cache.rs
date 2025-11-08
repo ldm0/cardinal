@@ -41,6 +41,26 @@ pub struct SearchOptions {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub struct CancellationToken<'a> {
+    version: u64,
+    latest_version: &'a AtomicU64,
+}
+
+impl<'a> CancellationToken<'a> {
+    pub fn new(version: u64, latest_version: &'a AtomicU64) -> Self {
+        Self {
+            version,
+            latest_version,
+        }
+    }
+
+    #[inline]
+    pub fn is_cancelled(&self) -> bool {
+        self.latest_version.load(Ordering::Relaxed) != self.version
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 enum SegmentKind {
     Substr,
     Prefix,
@@ -120,12 +140,8 @@ fn build_segment_matchers(
 }
 
 #[inline]
-fn search_cancelled(token: Option<(u64, &AtomicU64)>) -> bool {
-    if let Some((version, shared)) = token {
-        shared.load(Ordering::Relaxed) != version
-    } else {
-        false
-    }
+fn search_cancelled(token: Option<CancellationToken<'_>>) -> bool {
+    token.map_or(false, |token| token.is_cancelled())
 }
 
 impl std::fmt::Debug for SearchCache {
@@ -298,7 +314,7 @@ impl SearchCache {
         &self,
         line: &str,
         options: SearchOptions,
-        cancel_token: Option<(u64, &AtomicU64)>,
+        cancel_token: Option<CancellationToken<'_>>,
     ) -> Result<Vec<SlabIndex>> {
         let segments = query_segmentation(line);
         if segments.is_empty() {
