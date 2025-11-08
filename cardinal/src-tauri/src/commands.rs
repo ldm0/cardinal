@@ -1,5 +1,5 @@
 use crate::lifecycle::load_app_state;
-use anyhow::Result as AnyhowResult;
+use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
 use crossbeam_channel::{Receiver, Sender};
 use search_cache::{SearchOptions, SearchResultNode, SlabIndex, SlabNodeMetadata};
@@ -38,7 +38,7 @@ pub struct SearchJob {
 
 pub struct SearchState {
     search_tx: Sender<SearchJob>,
-    result_rx: Receiver<AnyhowResult<Vec<SlabIndex>>>,
+    result_rx: Receiver<Result<Vec<SlabIndex>>>,
 
     node_info_tx: Sender<Vec<SlabIndex>>,
     node_info_results_rx: Receiver<Vec<SearchResultNode>>,
@@ -51,7 +51,7 @@ impl SearchState {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         search_tx: Sender<SearchJob>,
-        result_rx: Receiver<AnyhowResult<Vec<SlabIndex>>>,
+        result_rx: Receiver<Result<Vec<SlabIndex>>>,
         node_info_tx: Sender<Vec<SlabIndex>>,
         node_info_results_rx: Receiver<Vec<SearchResultNode>>,
         icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
