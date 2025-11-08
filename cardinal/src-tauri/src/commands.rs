@@ -4,7 +4,13 @@ use base64::{Engine as _, engine::general_purpose};
 use crossbeam_channel::{Receiver, Sender};
 use search_cache::{SearchOptions, SearchResultNode, SlabIndex, SlabNodeMetadata};
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use std::{
+    process::Command,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+};
 use tauri::State;
 
 #[derive(Debug, Clone, Copy, Deserialize, Default)]
@@ -34,6 +40,7 @@ impl From<SearchOptionsPayload> for SearchOptions {
 pub struct SearchJob {
     pub query: String,
     pub options: SearchOptionsPayload,
+    pub version: u64,
 }
 
 pub struct SearchState {
@@ -45,6 +52,7 @@ pub struct SearchState {
 
     icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
     rescan_tx: Sender<()>,
+    search_version: Arc<AtomicU64>,
 }
 
 impl SearchState {
@@ -56,6 +64,7 @@ impl SearchState {
         node_info_results_rx: Receiver<Vec<SearchResultNode>>,
         icon_viewport_tx: Sender<(u64, Vec<SlabIndex>)>,
         rescan_tx: Sender<()>,
+        search_version: Arc<AtomicU64>,
     ) -> Self {
         Self {
             search_tx,
@@ -64,6 +73,7 @@ impl SearchState {
             node_info_results_rx,
             icon_viewport_tx,
             rescan_tx,
+            search_version,
         }
     }
 }
@@ -98,12 +108,18 @@ impl NodeInfoMetadata {
 pub async fn search(
     query: String,
     options: Option<SearchOptionsPayload>,
+    version: u64,
     state: State<'_, SearchState>,
 ) -> Result<Vec<SlabIndex>, String> {
     let options = options.unwrap_or_default();
+    state.search_version.swap(version, Ordering::SeqCst);
     state
         .search_tx
-        .send(SearchJob { query, options })
+        .send(SearchJob {
+            query,
+            options,
+            version,
+        })
         .map_err(|e| format!("Failed to send search request: {e:?}"))?;
 
     let search_result = state

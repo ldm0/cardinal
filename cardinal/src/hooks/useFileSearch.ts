@@ -219,6 +219,7 @@ export function useFileSearch(): UseFileSearchResult {
           useRegex,
           caseInsensitive: !caseSensitive,
         },
+        version: requestVersion,
       });
 
       const searchResults = Array.isArray(rawResults) ? toSlabIndexArray(rawResults) : [];

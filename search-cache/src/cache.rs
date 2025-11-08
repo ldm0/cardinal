@@ -14,7 +14,10 @@ use std::{
     ffi::OsStr,
     io::ErrorKind,
     path::{Path, PathBuf},
-    sync::{LazyLock, atomic::AtomicBool},
+    sync::{
+        LazyLock,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
     time::Instant,
 };
 use thin_vec::ThinVec;
@@ -114,6 +117,15 @@ fn build_segment_matchers(
             }
         })
         .collect()
+}
+
+#[inline]
+fn search_cancelled(token: Option<(u64, &AtomicU64)>) -> bool {
+    if let Some((version, shared)) = token {
+        shared.load(Ordering::Relaxed) != version
+    } else {
+        false
+    }
 }
 
 impl std::fmt::Debug for SearchCache {
@@ -279,13 +291,14 @@ impl SearchCache {
     }
 
     pub fn search(&self, line: &str) -> Result<Vec<SlabIndex>> {
-        self.search_with_options(line, SearchOptions::default())
+        self.search_with_options(line, SearchOptions::default(), None)
     }
 
     pub fn search_with_options(
         &self,
         line: &str,
         options: SearchOptions,
+        cancel_token: Option<(u64, &AtomicU64)>,
     ) -> Result<Vec<SlabIndex>> {
         let segments = query_segmentation(line);
         if segments.is_empty() {
@@ -296,9 +309,15 @@ impl SearchCache {
         let search_time = Instant::now();
         let mut node_set: Option<Vec<SlabIndex>> = None;
         for matcher in &matchers {
+            if search_cancelled(cancel_token) {
+                bail!("Search cancelled");
+            }
             if let Some(nodes) = &node_set {
                 let mut new_node_set = Vec::with_capacity(nodes.len());
                 for &node in nodes {
+                    if search_cancelled(cancel_token) {
+                        bail!("Search cancelled");
+                    }
                     let mut child_matches = self.slab[node]
                         .children
                         .iter()
@@ -328,8 +347,14 @@ impl SearchCache {
                     },
                     SegmentMatcher::Regex { regex } => NAME_POOL.search_regex(regex),
                 };
+                if search_cancelled(cancel_token) {
+                    bail!("Search cancelled");
+                }
                 let mut nodes = Vec::with_capacity(names.len());
-                names.into_iter().for_each(|name| {
+                for name in names {
+                    if search_cancelled(cancel_token) {
+                        bail!("Search cancelled");
+                    }
                     // namepool doesn't shrink, so it can contains non-existng names. Therefore, we don't error out on None branch here.
                     if let Some(x) = self.name_index.get(name) {
                         if x.len() == 1 {
@@ -348,7 +373,7 @@ impl SearchCache {
                             nodes.extend(node_paths.into_iter().map(|(_, index)| index));
                         }
                     }
-                });
+                }
                 node_set = Some(nodes);
             }
         }
@@ -612,7 +637,7 @@ impl SearchCache {
         query: String,
         options: SearchOptions,
     ) -> Result<Vec<SearchResultNode>> {
-        self.search_with_options(&query, options)
+        self.search_with_options(&query, options, None)
             .map(|nodes| self.expand_file_nodes_inner::<false>(&nodes))
     }
 
@@ -946,7 +971,7 @@ mod tests {
             use_regex: true,
             case_insensitive: false,
         };
-        let indices = cache.search_with_options("foo\\d+", opts).unwrap();
+        let indices = cache.search_with_options("foo\\d+", opts, None).unwrap();
         assert_eq!(indices.len(), 1);
         let nodes = cache.expand_file_nodes(&indices);
         assert_eq!(nodes.len(), 1);
@@ -957,7 +982,7 @@ mod tests {
             use_regex: true,
             case_insensitive: false,
         };
-        let miss = cache.search_with_options("bar\\d+", opts).unwrap();
+        let miss = cache.search_with_options("bar\\d+", opts, None).unwrap();
         assert!(miss.is_empty());
     }
 
@@ -974,7 +999,7 @@ mod tests {
             use_regex: false,
             case_insensitive: true,
         };
-        let indices = cache.search_with_options("alpha.txt", opts).unwrap();
+        let indices = cache.search_with_options("alpha.txt", opts, None).unwrap();
         assert_eq!(indices.len(), 1);
         let nodes = cache.expand_file_nodes(&indices);
         assert_eq!(nodes.len(), 1);
@@ -984,7 +1009,7 @@ mod tests {
             use_regex: false,
             case_insensitive: true,
         };
-        let miss = cache.search_with_options("gamma.txt", opts).unwrap();
+        let miss = cache.search_with_options("gamma.txt", opts, None).unwrap();
         assert!(miss.is_empty());
     }
 

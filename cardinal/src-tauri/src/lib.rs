@@ -21,8 +21,8 @@ use search_cache::{SearchCache, SearchResultNode, SlabIndex, WalkData};
 use std::{
     path::{Path, PathBuf},
     sync::{
-        LazyLock, Once,
-        atomic::{AtomicBool, Ordering},
+        Arc, LazyLock, Once,
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
@@ -61,6 +61,7 @@ pub fn run() -> Result<()> {
     let (icon_viewport_tx, icon_viewport_rx) = unbounded::<(u64, Vec<SlabIndex>)>();
     let (rescan_tx, rescan_rx) = unbounded::<()>();
     let (icon_update_tx, icon_update_rx) = unbounded::<IconPayload>();
+    let search_version = Arc::new(AtomicU64::new(0));
 
     let quick_launch_shortcut_plugin = tauri_plugin_global_shortcut::Builder::new()
         .with_shortcut(QUICK_LAUNCH_SHORTCUT)
@@ -122,6 +123,7 @@ pub fn run() -> Result<()> {
             node_info_results_rx,
             icon_viewport_tx.clone(),
             rescan_tx.clone(),
+            search_version.clone(),
         ))
         .invoke_handler(tauri::generate_handler![
             search,
@@ -245,6 +247,7 @@ pub fn run() -> Result<()> {
                     icon_viewport_rx,
                     rescan_rx,
                     icon_update_tx,
+                    search_version: search_version.clone(),
                 },
                 WATCH_ROOT,
                 FSE_LATENCY_SECS,

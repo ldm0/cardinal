@@ -11,7 +11,10 @@ use search_cache::{HandleFSEError, SearchCache, SearchOptions, SearchResultNode,
 use serde::Serialize;
 use std::{
     path::PathBuf,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Emitter};
@@ -40,6 +43,7 @@ pub struct BackgroundLoopChannels {
     pub icon_viewport_rx: Receiver<(u64, Vec<SlabIndex>)>,
     pub rescan_rx: Receiver<()>,
     pub icon_update_tx: Sender<IconPayload>,
+    pub search_version: Arc<AtomicU64>,
 }
 
 pub fn emit_status_bar_update(
@@ -91,6 +95,7 @@ pub fn run_background_event_loop(
         icon_viewport_rx,
         rescan_rx,
         icon_update_tx,
+        search_version,
     } = channels;
     let mut processed_events = 0usize;
     let mut history_ready = load_app_state() == AppLifecycleState::Ready;
@@ -102,12 +107,20 @@ pub fn run_background_event_loop(
                 return;
             }
             recv(search_rx) -> job => {
-                let SearchJob { query, options } = job.expect("Search channel closed");
+                let SearchJob {
+                    query,
+                    options,
+                    version,
+                } = job.expect("Search channel closed");
                 let opts = SearchOptions::from(options);
                 let result = if query.is_empty() {
                     Ok(cache.search_empty())
                 } else {
-                    cache.search_with_options(&query, opts)
+                    cache.search_with_options(
+                        &query,
+                        opts,
+                        Some((version, search_version.as_ref())),
+                    )
                 };
                 result_tx.send(result).expect("Failed to send result");
             }
