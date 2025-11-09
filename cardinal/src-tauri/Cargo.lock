@@ -1135,6 +1135,7 @@ dependencies = [
  "serde",
  "serde_repr",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

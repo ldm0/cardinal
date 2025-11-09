@@ -137,7 +137,7 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
         RUNTIME.spawn(async move {
             tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
             if !done_clone.load(std::sync::atomic::Ordering::Relaxed) {
-                eprintln!("walking file slow: {:?}", path_clone);
+                tracing::warn!("walking file slow: {:?}", path_clone);
             }
         });
         // doesn't traverse symlink
@@ -167,7 +167,7 @@ fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
             RUNTIME.spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
                 if !done_clone.load(std::sync::atomic::Ordering::Relaxed) {
-                    eprintln!("reading dir slow: {:?}", path_clone);
+                    tracing::warn!("reading dir slow: {:?}", path_clone);
                 }
             });
             let rd = fs::read_dir(path);

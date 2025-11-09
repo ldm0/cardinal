@@ -402,6 +402,7 @@ dependencies = [
  "serde_repr",
  "tempdir",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
