@@ -813,6 +813,13 @@ fn construct_node_slab(
             depth, MAX_NODE_SLAB_DEPTH, full_path
         );
     }
+    let time = NODE_SLAB_CONSTRUCTION_TIME.fetch_add(1, Ordering::Relaxed);
+    info!(
+        "construct_node_slab progress: time= {}, depth={}, current_path={}",
+        time,
+        depth,
+        current_path.display()
+    );
     let metadata = match node.metadata {
         Some(metadata) => SlabNodeMetadataCompact::some(metadata),
         None => SlabNodeMetadataCompact::none(),
@@ -822,15 +829,6 @@ fn construct_node_slab(
     let index = slab.insert(slab_node);
     let mut children = ThinVec::with_capacity(node.children.len());
     for child in &node.children {
-        let time = NODE_SLAB_CONSTRUCTION_TIME.fetch_add(1, Ordering::Relaxed);
-        if time % 1000 == 0 {
-            info!(
-                "construct_node_slab progress: time= {}, depth={}, current_path={}",
-                time,
-                depth,
-                current_path.display()
-            );
-        }
         current_path.push(child.name.as_ref());
         let child_index = construct_node_slab(Some(index), child, slab, depth + 1, current_path);
         current_path.pop();
