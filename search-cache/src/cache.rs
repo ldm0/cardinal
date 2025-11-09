@@ -14,11 +14,11 @@ use std::{
     ffi::OsStr,
     io::ErrorKind,
     path::{Path, PathBuf},
-    sync::{LazyLock, atomic::AtomicBool},
+    sync::{atomic::{AtomicBool, AtomicU64, Ordering}, LazyLock},
     time::Instant,
 };
 use thin_vec::ThinVec;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use typed_num::Num;
 
 pub struct SearchCache {
@@ -218,7 +218,8 @@ impl SearchCache {
             // Then create the slab.
             let slab_time = Instant::now();
             let mut slab = ThinSlab::new();
-            let slab_root = construct_node_slab(None, &node, &mut slab);
+            let mut current_path = path.to_path_buf();
+            let slab_root = construct_node_slab(None, &node, &mut slab, 0, &mut current_path);
             info!(
                 "Slab construction time: {:?}, slab root: {:?}, slab len: {:?}",
                 slab_time.elapsed(),
@@ -786,12 +787,31 @@ pub enum HandleFSEError {
     Rescan,
 }
 
+const MAX_NODE_SLAB_DEPTH: usize = 200;
+
+static NODE_SLAB_CONSTRUCTION_TIME: AtomicU64 = AtomicU64::new(0);
+
 /// Note: This function is expected to be called with WalkData which metadata is not fetched.
 fn construct_node_slab(
     parent: Option<SlabIndex>,
     node: &Node,
     slab: &mut ThinSlab<SlabNode>,
+    depth: usize,
+    current_path: &mut PathBuf,
 ) -> SlabIndex {
+    if depth >= MAX_NODE_SLAB_DEPTH {
+        let full_path = current_path.display().to_string();
+        error!(
+            depth,
+            max_depth = MAX_NODE_SLAB_DEPTH,
+            path = %full_path,
+            "construct_node_slab recursion depth exceeded"
+        );
+        panic!(
+            "construct_node_slab recursion depth exceeded: depth={}, max={}, path={}",
+            depth, MAX_NODE_SLAB_DEPTH, full_path
+        );
+    }
     let metadata = match node.metadata {
         Some(metadata) => SlabNodeMetadataCompact::some(metadata),
         None => SlabNodeMetadataCompact::none(),
@@ -799,11 +819,24 @@ fn construct_node_slab(
     let name = NAME_POOL.push(&node.name);
     let slab_node = SlabNode::new(parent, name, metadata);
     let index = slab.insert(slab_node);
-    slab[index].children = node
-        .children
-        .iter()
-        .map(|node| construct_node_slab(Some(index), node, slab))
-        .collect();
+    let mut children = ThinVec::with_capacity(node.children.len());
+    for child in &node.children {
+        let time = NODE_SLAB_CONSTRUCTION_TIME.fetch_add(1, Ordering::Relaxed);
+        if time % 1000 == 0 {
+            info!(
+                "construct_node_slab progress: time= {}, depth={}, current_path={}",
+                time,
+                depth,
+                current_path.display()
+            );
+        }
+        current_path.push(child.name.as_ref());
+        let child_index = construct_node_slab(Some(index), child, slab, depth + 1, current_path);
+        current_path.pop();
+        children.push(child_index);
+    }
+
+    slab[index].children = children;
     index
 }
 

@@ -45,3 +45,6 @@ fs-icon.path = "../../fs-icon"
 default = []
 # https://v2.tauri.app/develop/debug/#enable-devtools-feature
 dev = ["tauri/devtools"]
+
+[profile.release]
+strip = false
