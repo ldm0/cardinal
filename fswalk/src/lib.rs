@@ -7,7 +7,10 @@ use std::{
     num::NonZeroU64,
     os::unix::fs::MetadataExt,
     path::Path,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
     time::UNIX_EPOCH,
 };
 
@@ -121,28 +124,56 @@ pub fn walk_it(dir: &Path, walk_data: &WalkData) -> Option<Node> {
     walk(dir, walk_data)
 }
 
+static RUNTIME: std::sync::LazyLock<tokio::runtime::Runtime> = std::sync::LazyLock::new(|| tokio::runtime::Builder::new_multi_thread().worker_threads(4).enable_all().build().unwrap());
+
 fn walk(path: &Path, walk_data: &WalkData) -> Option<Node> {
     if walk_data.ignore_directory == Some(path) {
         return None;
     }
-    // doesn't traverse symlink
-    let metadata = match path.symlink_metadata() {
-        Ok(metadata) => Some(metadata),
-        // If it's not found, we definitely don't want it.
-        Err(e) if e.kind() == ErrorKind::NotFound => return None,
-        // If it's permission denied or something, we still want to insert it into the tree.
-        Err(e) => {
-            if handle_error_and_retry(&e) {
-                // doesn't traverse symlink
-                path.symlink_metadata().ok()
-            } else {
-                None
+    let metadata = {
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = Arc::clone(&done);
+        let path_clone = path.to_path_buf();
+        RUNTIME.spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
+            if !done_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                eprintln!("walking file slow: {:?}", path_clone);
             }
-        }
+        });
+        // doesn't traverse symlink
+        let metadata = match path.symlink_metadata() {
+            Ok(metadata) => Some(metadata),
+            // If it's not found, we definitely don't want it.
+            Err(e) if e.kind() == ErrorKind::NotFound => return None,
+            // If it's permission denied or something, we still want to insert it into the tree.
+            Err(e) => {
+                if handle_error_and_retry(&e) {
+                    // doesn't traverse symlink
+                    path.symlink_metadata().ok()
+                } else {
+                    None
+                }
+            }
+        };
+        done.store(true, std::sync::atomic::Ordering::Relaxed);
+        metadata
     };
     let children = if metadata.as_ref().map(|x| x.is_dir()).unwrap_or_default() {
         walk_data.num_dirs.fetch_add(1, Ordering::Relaxed);
-        let read_dir = fs::read_dir(path);
+        let read_dir = {
+            let done = Arc::new(AtomicBool::new(false));
+            let done_clone = Arc::clone(&done);
+            let path_clone = path.to_path_buf();
+            RUNTIME.spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
+                if !done_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                    eprintln!("reading dir slow: {:?}", path_clone);
+                }
+            });
+            let rd = fs::read_dir(path);
+            done.store(true, std::sync::atomic::Ordering::Relaxed);
+            rd
+        };
         match read_dir {
             Ok(entries) => entries
                 .into_iter()

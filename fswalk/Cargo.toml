@@ -9,6 +9,7 @@ serde_repr = "0.1.0"
 rayon = "1"
 memchr = "2.7.4"
 enumn = "0.1.14"
+tokio = { version = "1", features = ["full"] }
 
 [dev-dependencies]
 tempdir = "0.3"
