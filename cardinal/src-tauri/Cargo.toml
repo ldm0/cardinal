@@ -48,3 +48,4 @@ dev = ["tauri/devtools"]
 
 [profile.release]
 strip = false
+debug = 2
