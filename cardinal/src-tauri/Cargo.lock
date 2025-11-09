@@ -2275,6 +2275,7 @@ dependencies = [
  "regex",
  "rustc-hash",
  "serde",
+ "tracing",
 ]
 
 [[package]]

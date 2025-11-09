@@ -49,7 +49,10 @@ impl NamePool {
     /// One important feature of NamePool is that the returned offset is stable
     /// and won't be overwritten.
     pub fn push<'c>(&'c self, name: &str) -> &'c str {
-        let mut inner = self.inner.lock();
+        let Some(mut inner) = self.inner.try_lock_for(std::time::Duration::from_millis(3000)) else {
+            tracing::warn!("NamePool push lock timeout: name={}", name);
+            panic!("NamePool push lock timeout: name={}", name);
+        };
         if !inner.contains(name) {
             inner.insert(name.into());
         }

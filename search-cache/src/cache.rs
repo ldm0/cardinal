@@ -194,6 +194,7 @@ impl SearchCache {
 
     /// This function is expected to be called with WalkData which metadata is not fetched.
     /// If cancelled during walking, None is returned.
+    #[inline(never)]
     pub fn walk_fs_with_walk_data(
         path: PathBuf,
         walk_data: &WalkData,
