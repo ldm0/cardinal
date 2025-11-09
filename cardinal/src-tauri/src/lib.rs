@@ -18,9 +18,11 @@ use lifecycle::{
 };
 use search_cache::{SearchCache, SearchResultNode, SlabIndex, WalkData};
 use std::{
+    fs::{self, OpenOptions},
+    io,
     path::{Path, PathBuf},
     sync::{
-        LazyLock, Once,
+        LazyLock, Once, OnceLock,
         atomic::{AtomicBool, Ordering},
     },
     time::Duration,
@@ -28,7 +30,11 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, WindowEvent};
 use tauri_plugin_global_shortcut::ShortcutState;
 use tracing::{info, level_filters::LevelFilter, warn};
-use tracing_subscriber::EnvFilter;
+use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
+use tracing_subscriber::{
+    EnvFilter,
+    fmt::writer::{BoxMakeWriter, MakeWriterExt},
+};
 use window_controls::{WindowToggle, activate_window, hide_window, toggle_window};
 
 static CACHE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
@@ -40,16 +46,56 @@ static CACHE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
         .config_dir()
         .join("cardinal.db")
 });
+static LOG_GUARD: OnceLock<WorkerGuard> = OnceLock::new();
 const QUICK_LAUNCH_SHORTCUT: &str = "CmdOrCtrl+Shift+Space";
+
+fn init_tracing() {
+    let env_filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .from_env_lossy();
+    let builder = tracing_subscriber::fmt().with_env_filter(env_filter);
+    let writer: BoxMakeWriter = match init_log_writer() {
+        Some(file_writer) => BoxMakeWriter::new(io::stdout.and(file_writer)),
+        None => BoxMakeWriter::new(io::stdout),
+    };
+
+    if let Err(err) = builder.with_writer(writer).try_init() {
+        eprintln!("Failed to initialize tracing subscriber: {err}");
+    }
+}
+
+fn init_log_writer() -> Option<NonBlocking> {
+    let dirs = match directories::ProjectDirs::from("", "", "Cardinal") {
+        Some(dirs) => dirs,
+        None => {
+            eprintln!("Failed to resolve project directories for logging");
+            return None;
+        }
+    };
+
+    let log_dir = dirs.data_dir().join("logs");
+    if let Err(err) = fs::create_dir_all(&log_dir) {
+        eprintln!("Failed to create log directory {:?}: {err}", log_dir);
+        return None;
+    }
+
+    let log_path = log_dir.join("cardinal.log");
+    let file = match OpenOptions::new().create(true).append(true).open(&log_path) {
+        Ok(file) => file,
+        Err(err) => {
+            eprintln!("Failed to open log file {:?}: {err}", log_path);
+            return None;
+        }
+    };
+
+    let (writer, guard) = tracing_appender::non_blocking(file);
+    let _ = LOG_GUARD.set(guard);
+    Some(writer)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> Result<()> {
-    let builder = tracing_subscriber::fmt();
-    if let Ok(filter) = EnvFilter::try_from_default_env() {
-        builder.with_env_filter(filter).init();
-    } else {
-        builder.with_max_level(LevelFilter::INFO).init();
-    }
+    init_tracing();
 
     let (finish_tx, finish_rx) = bounded::<Sender<Option<SearchCache>>>(1);
     let (search_tx, search_rx) = unbounded::<SearchJob>();
