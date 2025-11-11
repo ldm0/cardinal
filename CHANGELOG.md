@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7 — 2025-11-12
+- Added a cancellable search pipeline for a more responsive search experience.
+- Refined selected row styling with dedicated text color tokens for better contrast in both themes.
+
 ## 0.1.6 — 2025-11-11
 - Further optimized search execution and reorganized the search cache for faster lookups.
 

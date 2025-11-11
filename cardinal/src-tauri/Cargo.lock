@@ -379,7 +379,7 @@ dependencies = [
 
 [[package]]
 name = "cardinal"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
