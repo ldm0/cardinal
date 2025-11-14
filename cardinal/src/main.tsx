@@ -3,10 +3,12 @@ import ReactDOM from 'react-dom/client';
 import './i18n/config';
 import App from './App';
 import { initializeTray } from './tray';
+import { initializeAppMenu } from './menu';
 import { initializeThemePreference } from './theme';
 
 initializeThemePreference();
 void initializeTray();
+void initializeAppMenu();
 
 const rootElement = document.getElementById('root');
 
