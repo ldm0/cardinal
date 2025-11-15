@@ -186,7 +186,7 @@ impl SearchCache {
         options: SearchOptions,
         cancellation_token: CancellationToken,
     ) -> Result<Option<Vec<SlabIndex>>> {
-        let parsed = parse_query(line).map_err(|err| anyhow!("Failed to parse query: {}", err))?;
+        let parsed = parse_query(line).map_err(|err| anyhow!("Failed to parse query: {err}"))?;
         let search_time = Instant::now();
         let result = self.evaluate_expr(&parsed.expr, options, cancellation_token);
         info!("Search time: {:?}", search_time.elapsed());
@@ -1667,8 +1667,7 @@ mod tests {
             names_or.contains(&"foo.txt".to_string())
                 && names_or.contains(&"bar.txt".to_string())
                 && names_or.contains(&"foobar.txt".to_string()),
-            "OR query should include any matching term. Found: {:?}",
-            names_or
+            "OR query should include any matching term. Found: {names_or:?}"
         );
 
         let excluded = query(&mut cache, "!foo");

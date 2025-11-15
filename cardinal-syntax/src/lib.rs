@@ -737,10 +737,8 @@ impl<'a> Parser<'a> {
             let matched = if self.peek_char() == Some('|') {
                 self.advance_char();
                 true
-            } else if self.consume_keyword("OR") {
-                true
             } else {
-                false
+                self.consume_keyword("OR")
             };
 
             if !matched {

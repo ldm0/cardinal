@@ -1,6 +1,6 @@
 mod common;
-use common::*;
 use cardinal_syntax::*;
+use common::*;
 
 #[test]
 fn keyword_boundaries_do_not_consume_neighbors() {
@@ -131,5 +131,8 @@ fn date_filters_allow_hyphen_ranges_only_for_dates() {
     // size: should not accept hyphen as range unless date-like (stays bare)
     let expr = parse_ok("size:10-20");
     let (_, arg) = common::filter_kind(&expr);
-    assert!(matches!(arg.as_ref().unwrap().kind, ArgumentKind::Bare | ArgumentKind::Comparison(_)));
+    assert!(matches!(
+        arg.as_ref().unwrap().kind,
+        ArgumentKind::Bare | ArgumentKind::Comparison(_)
+    ));
 }

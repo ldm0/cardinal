@@ -1,6 +1,6 @@
 mod common;
-use common::*;
 use cardinal_syntax::*;
+use common::*;
 
 #[test]
 fn and_is_implicit_by_whitespace() {
@@ -72,9 +72,8 @@ fn not_binds_tighter_than_or_and_and() {
 fn not_chain_collapses_to_single() {
     let expr = parse_ok("!!!foo");
     let inner = as_not(&expr);
-    match inner {
-        Expr::Not(_) => panic!("double NOT should cancel"),
-        _ => (),
+    if let Expr::Not(_) = inner {
+        panic!("double NOT should cancel")
     }
 }
 

@@ -140,7 +140,7 @@ fn all_examples_parse() {
         Example("<D: | E:> *.mp3|*.wav"),
         Example("D:|E: *.mp3"),
         Example("D: *.jpg|*.png"),
-        Example("regex:  ^Readme\\.md$")
+        Example("regex:  ^Readme\\.md$"),
     ];
 
     for Example(q) in cases {

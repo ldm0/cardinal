@@ -1,6 +1,6 @@
 mod common;
-use common::*;
 use cardinal_syntax::*;
+use common::*;
 
 #[test]
 fn parses_bare_words_and_wildcards() {

@@ -332,7 +332,7 @@ impl SearchCache {
         Ok(filter_nodes(nodes, token, |index| {
             self.file_nodes
                 .node_path(index)
-                .map_or(false, |path| path.starts_with(&target) && path != target)
+                .is_some_and(|path| path.starts_with(&target) && path != target)
         }))
     }
 

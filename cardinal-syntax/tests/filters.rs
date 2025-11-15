@@ -1,6 +1,6 @@
 mod common;
-use common::*;
 use cardinal_syntax::*;
+use common::*;
 
 #[test]
 fn recognized_filter_kinds_without_arguments() {

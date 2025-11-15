@@ -1,6 +1,6 @@
 mod common;
-use common::*;
 use cardinal_syntax::*;
+use common::*;
 
 #[test]
 fn dotted_range_in_size() {

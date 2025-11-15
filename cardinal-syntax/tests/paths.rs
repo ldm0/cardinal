@@ -43,7 +43,9 @@ fn parses_windows_drive_roots_and_dirs() {
 fn parses_env_expanded_style_segments_as_words() {
     let expr = parse_ok("%TEMP%\\*.log");
     match &expr {
-        cardinal_syntax::Expr::Term(cardinal_syntax::Term::Word(w)) => assert_eq!(w, "%TEMP%\\*.log"),
+        cardinal_syntax::Expr::Term(cardinal_syntax::Term::Word(w)) => {
+            assert_eq!(w, "%TEMP%\\*.log")
+        }
         other => panic!("unexpected {other:?}"),
     }
 }
